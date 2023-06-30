@@ -355,7 +355,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 set_zoom(5.0, None, state);
             }
             if key_pressed(app, state, Favourite) {
-                debug!("Favourite");
+                add_to_favourites(state);
             }
 
             if key_pressed(app, state, Quit) {
@@ -1069,4 +1069,10 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
         delta,
     );
     state.image_geometry.scale = scale;
+}
+
+fn add_to_favourites(state: &OculanteState) {
+    if let Some(img_path) = &state.current_path {
+        debug!("Favourite img: {}", img_path.to_string_lossy());
+    }
 }
