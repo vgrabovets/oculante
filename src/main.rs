@@ -354,6 +354,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
             }
+            if key_pressed(app, state, Favourite) {
+                debug!("Favourite");
+            }
 
             if key_pressed(app, state, Quit) {
                 // std::process::exit(0)
