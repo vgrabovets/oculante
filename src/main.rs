@@ -14,6 +14,7 @@ use notan::prelude::*;
 use shortcuts::key_pressed;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
@@ -1078,7 +1079,7 @@ fn add_to_favourites(state: &OculanteState) {
         let mut file = OpenOptions::new()
             .append(true)
             .create(true)
-            .open("/tmp/favourites.txt")
+            .open(img_path.parent().unwrap().join(Path::new("favourites.txt")))
             .expect("Unable to open file");
 
         writeln!(file, "{}", img_path.to_string_lossy()).expect("Unable to write data");
