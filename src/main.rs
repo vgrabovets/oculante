@@ -12,6 +12,8 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::mpsc;
 pub mod cache;
@@ -1073,6 +1075,12 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 
 fn add_to_favourites(state: &OculanteState) {
     if let Some(img_path) = &state.current_path {
-        debug!("Favourite img: {}", img_path.to_string_lossy());
+        let mut file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("/tmp/favourites.txt")
+            .expect("Unable to open file");
+
+        writeln!(file, "{}", img_path.to_string_lossy()).expect("Unable to write data");
     }
 }
