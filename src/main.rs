@@ -1041,6 +1041,20 @@ fn browse_for_image_path(state: &mut OculanteState) {
     }
 }
 
+fn browse_for_folder_path(state: &mut OculanteState) {
+    let start_directory = &state.persistent_settings.last_open_directory;
+
+    let folder_dialog_result = rfd::FileDialog::new()
+        .set_directory(start_directory)
+        .pick_folder();
+
+    if let Some(folder_path) = folder_dialog_result {
+        debug!("Selected Folder Path = {:?}", folder_path);
+        state.persistent_settings.last_open_directory = folder_path.to_path_buf();
+        _ = state.persistent_settings.save();
+    }
+}
+
 // Make sure offset is restricted to window size so we don't offset to infinity
 fn limit_offset(app: &mut App, state: &mut OculanteState) {
     let window_size = app.window().size();

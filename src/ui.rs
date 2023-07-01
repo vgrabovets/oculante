@@ -1,5 +1,5 @@
 #[cfg(feature = "file_open")]
-use crate::browse_for_image_path;
+use crate::{browse_for_folder_path, browse_for_image_path};
 use crate::{
     appstate::{ImageGeometry, OculanteState},
     image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
@@ -1786,11 +1786,19 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         #[cfg(feature = "file_open")]
-        if unframed_button("🗁", ui)
+        if unframed_button("📄", ui)
             .on_hover_text("Browse for image")
             .clicked()
         {
             browse_for_image_path(state)
+        }
+
+        #[cfg(feature = "file_open")]
+        if unframed_button("🗁", ui)
+            .on_hover_text("Browse for folder")
+            .clicked()
+        {
+            browse_for_folder_path(state)
         }
 
         ui.scope(|ui| {
