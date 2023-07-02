@@ -12,7 +12,7 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use std::fs::OpenOptions;
+use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -1052,6 +1052,13 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         debug!("Selected Folder Path = {:?}", folder_path);
         state.persistent_settings.last_open_directory = folder_path.to_path_buf();
         _ = state.persistent_settings.save();
+
+        for file in fs::read_dir(folder_path).expect("Could not read directory") {
+            let file = file.unwrap().path();
+            if is_ext_compatible(file.as_path()) {
+                debug!("file: {:?}", file);
+            }
+        }
     }
 }
 
@@ -1090,7 +1097,7 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 
 fn add_to_favourites(state: &OculanteState) {
     if let Some(img_path) = &state.current_path {
-        let mut file = OpenOptions::new()
+        let mut file = fs::OpenOptions::new()
             .append(true)
             .create(true)
             .open(img_path.parent().unwrap().join(Path::new("favourites.txt")))
