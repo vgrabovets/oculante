@@ -11,6 +11,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use rand::seq::SliceRandom;
 use shortcuts::key_pressed;
 use std::fs;
 use std::io::Write;
@@ -1049,16 +1050,21 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         .pick_folder();
 
     if let Some(folder_path) = folder_dialog_result {
-        debug!("Selected Folder Path = {:?}", folder_path);
         state.persistent_settings.last_open_directory = folder_path.to_path_buf();
         _ = state.persistent_settings.save();
+
+        let mut files: Vec<PathBuf> = Vec::new();
 
         for file in fs::read_dir(folder_path).expect("Could not read directory") {
             let file = file.unwrap().path();
             if is_ext_compatible(file.as_path()) {
-                debug!("file: {:?}", file);
+                files.push(file);
             }
         }
+
+        let mut rng = rand::thread_rng();
+        files.shuffle(&mut rng);
+        debug!("files: {:?}", files);
     }
 }
 
