@@ -661,7 +661,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         // fill image sequence
         if let Some(p) = &state.current_path {
-            state.scrubber = scrubber::Scrubber::new(p);
+            state.scrubber = scrubber::Scrubber::new(p, false);
             state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
             // debug!("{:#?} from {}", &state.scrubber, p.display());
@@ -1052,7 +1052,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         state.persistent_settings.last_open_directory = folder_path.clone();
         _ = state.persistent_settings.save();
 
-        state.scrubber = Scrubber::new(folder_path.as_path());
+        state.scrubber = Scrubber::new(folder_path.as_path(), true);
         let current_path = state.scrubber.next();
 
         state.is_loaded = false;

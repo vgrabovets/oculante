@@ -12,8 +12,8 @@ pub struct Scrubber {
 }
 
 impl Scrubber {
-    pub fn new(path: &Path) -> Self {
-        let entries = get_image_filenames_for_directory(path, false).unwrap_or_default();
+    pub fn new(path: &Path, randomize: bool) -> Self {
+        let entries = get_image_filenames_for_directory(path, randomize).unwrap_or_default();
         let index = entries.iter().position(|p| p == path).unwrap_or_default();
         Self {
             index,
