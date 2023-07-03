@@ -11,7 +11,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
-use rand::seq::SliceRandom;
+use scrubber::get_image_filenames_for_directory;
 use shortcuts::key_pressed;
 use std::fs;
 use std::io::Write;
@@ -1053,18 +1053,19 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         state.persistent_settings.last_open_directory = folder_path.to_path_buf();
         _ = state.persistent_settings.save();
 
-        let mut files: Vec<PathBuf> = Vec::new();
+        let files = get_image_filenames_for_directory(folder_path.as_path(), true)
+            .unwrap_or_default();
 
-        for file in fs::read_dir(folder_path).expect("Could not read directory") {
-            let file = file.unwrap().path();
-            if is_ext_compatible(file.as_path()) {
-                files.push(file);
-            }
+        if files.is_empty() {
+            debug!("no supported files in the folder");
+            return;
         }
 
-        let mut rng = rand::thread_rng();
-        files.shuffle(&mut rng);
-        debug!("files: {:?}", files);
+        state.is_loaded = false;
+        state.current_image = None;
+        state
+            .player
+            .load(&files[0], state.message_channel.0.clone());
     }
 }
 

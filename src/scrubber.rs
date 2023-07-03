@@ -1,6 +1,7 @@
 use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
 use log::debug;
+use rand::seq::SliceRandom;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -12,7 +13,7 @@ pub struct Scrubber {
 
 impl Scrubber {
     pub fn new(path: &Path) -> Self {
-        let entries = get_image_filenames_for_directory(path).unwrap_or_default();
+        let entries = get_image_filenames_for_directory(path, false).unwrap_or_default();
         let index = entries.iter().position(|p| p == path).unwrap_or_default();
         Self {
             index,
@@ -61,7 +62,7 @@ impl Scrubber {
 // Get sorted list of files in a folder
 // TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
 // TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
-pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathBuf>> {
+pub fn get_image_filenames_for_directory(folder_path: &Path, randomize: bool) -> Result<Vec<PathBuf>> {
     let mut folder_path = folder_path.to_path_buf();
     if folder_path.is_file() {
         folder_path = folder_path
@@ -78,16 +79,21 @@ pub fn get_image_filenames_for_directory(folder_path: &Path) -> Result<Vec<PathB
         .filter(|x| is_ext_compatible(x))
         .collect::<Vec<PathBuf>>();
 
-    dir_files.sort_unstable_by(|a, b| {
-        lexical_sort::natural_lexical_cmp(
-            &a.file_name()
-                .map(|f| f.to_string_lossy())
-                .unwrap_or_default(),
-            &b.file_name()
-                .map(|f| f.to_string_lossy())
-                .unwrap_or_default(),
-        )
-    });
+    if randomize {
+        let mut rng = rand::thread_rng();
+        dir_files.shuffle(&mut rng);
+    } else {
+        dir_files.sort_unstable_by(|a, b| {
+            lexical_sort::natural_lexical_cmp(
+                &a.file_name()
+                    .map(|f| f.to_string_lossy())
+                    .unwrap_or_default(),
+                &b.file_name()
+                    .map(|f| f.to_string_lossy())
+                    .unwrap_or_default(),
+            )
+        });
+    }
 
     return Ok(dir_files);
 }
@@ -98,7 +104,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
     if !folder_path.is_dir() {
         bail!("This is not a folder");
     };
-    get_image_filenames_for_directory(folder_path).map(|x| {
+    get_image_filenames_for_directory(folder_path, false).map(|x| {
         x.first()
             .cloned()
             .context("Folder does not have any supported images in it")
