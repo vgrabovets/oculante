@@ -11,7 +11,6 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
-use scrubber::get_image_filenames_for_directory;
 use shortcuts::key_pressed;
 use std::fs;
 use std::io::Write;
@@ -24,7 +23,7 @@ pub mod settings;
 pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
-use crate::scrubber::find_first_image_in_directory;
+use crate::scrubber::{find_first_image_in_directory, Scrubber};
 use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
@@ -1050,22 +1049,19 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         .pick_folder();
 
     if let Some(folder_path) = folder_dialog_result {
-        state.persistent_settings.last_open_directory = folder_path.to_path_buf();
+        state.persistent_settings.last_open_directory = folder_path.clone();
         _ = state.persistent_settings.save();
 
-        let files = get_image_filenames_for_directory(folder_path.as_path(), true)
-            .unwrap_or_default();
-
-        if files.is_empty() {
-            debug!("no supported files in the folder");
-            return;
-        }
+        state.scrubber = Scrubber::new(folder_path.as_path());
+        let current_path = state.scrubber.next();
 
         state.is_loaded = false;
         state.current_image = None;
         state
             .player
-            .load(&files[0], state.message_channel.0.clone());
+            .load(current_path.as_path(), state.message_channel.0.clone());
+
+        state.current_path = Some(current_path);
     }
 }
 
