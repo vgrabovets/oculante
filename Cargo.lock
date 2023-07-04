@@ -3189,6 +3189,7 @@ dependencies = [
  "tiny-skia 0.9.1",
  "turbojpeg",
  "usvg",
+ "walkdir",
  "webbrowser",
  "windres",
  "winres",

@@ -660,14 +660,16 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         set_title(app, state);
 
         // fill image sequence
-        if let Some(p) = &state.current_path {
-            state.scrubber = scrubber::Scrubber::new(p, false);
-            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+        if !state.folder_selected {
+            if let Some(p) = &state.current_path {
+                state.scrubber = scrubber::Scrubber::new(p, false, false);
+                state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
-            // debug!("{:#?} from {}", &state.scrubber, p.display());
-            if !state.persistent_settings.recent_images.contains(p) {
-                state.persistent_settings.recent_images.insert(0, p.clone());
-                state.persistent_settings.recent_images.truncate(10);
+                // debug!("{:#?} from {}", &state.scrubber, p.display());
+                if !state.persistent_settings.recent_images.contains(p) {
+                    state.persistent_settings.recent_images.insert(0, p.clone());
+                    state.persistent_settings.recent_images.truncate(10);
+                }
             }
         }
 
@@ -1028,6 +1030,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
 
     if let Some(file_path) = file_dialog_result {
         debug!("Selected File Path = {:?}", file_path);
+        state.folder_selected = false;
         state.is_loaded = false;
         state.current_image = None;
         state
@@ -1051,8 +1054,9 @@ fn browse_for_folder_path(state: &mut OculanteState) {
     if let Some(folder_path) = folder_dialog_result {
         state.persistent_settings.last_open_directory = folder_path.clone();
         _ = state.persistent_settings.save();
+        state.folder_selected = true;
 
-        state.scrubber = Scrubber::new(folder_path.as_path(), true);
+        state.scrubber = Scrubber::new(folder_path.as_path(), true, true);
         let current_path = state.scrubber.next();
 
         state.is_loaded = false;

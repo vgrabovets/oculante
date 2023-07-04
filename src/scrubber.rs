@@ -3,6 +3,7 @@ use anyhow::{bail, Context, Result};
 use log::debug;
 use rand::seq::SliceRandom;
 use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 #[derive(Debug, Default)]
 pub struct Scrubber {
@@ -12,8 +13,9 @@ pub struct Scrubber {
 }
 
 impl Scrubber {
-    pub fn new(path: &Path, randomize: bool) -> Self {
-        let entries = get_image_filenames_for_directory(path, randomize).unwrap_or_default();
+    pub fn new(path: &Path, randomize: bool, walk_files: bool) -> Self {
+        let entries = get_image_filenames_for_directory(path, randomize, walk_files)
+            .unwrap_or_default();
         let index = entries.iter().position(|p| p == path).unwrap_or_default();
         Self {
             index,
@@ -62,7 +64,7 @@ impl Scrubber {
 // Get sorted list of files in a folder
 // TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
 // TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
-pub fn get_image_filenames_for_directory(folder_path: &Path, randomize: bool) -> Result<Vec<PathBuf>> {
+pub fn get_image_filenames_for_directory(folder_path: &Path, randomize: bool, walk_files: bool) -> Result<Vec<PathBuf>> {
     let mut folder_path = folder_path.to_path_buf();
     if folder_path.is_file() {
         folder_path = folder_path
@@ -70,14 +72,26 @@ pub fn get_image_filenames_for_directory(folder_path: &Path, randomize: bool) ->
             .map(|p| p.to_path_buf())
             .context("Can't get parent")?;
     }
-    let info = std::fs::read_dir(folder_path)?;
+
+    let mut dir_files: Vec<PathBuf>;
+
+    if walk_files {
+        dir_files = WalkDir::new(folder_path)
+            .into_iter()
+            .filter_map(|v| v.ok())
+            .filter(|x| is_ext_compatible(x.path()))
+            .map(|x| x.into_path())
+            .collect::<Vec<PathBuf>>();
+    } else {
+        let info = std::fs::read_dir(folder_path)?;
+        dir_files = info
+            .flat_map(|x| x)
+            .map(|x| x.path())
+            .filter(|x| is_ext_compatible(x))
+            .collect::<Vec<PathBuf>>();
+    }
 
     // TODO: Are symlinks handled correctly?
-    let mut dir_files = info
-        .flat_map(|x| x)
-        .map(|x| x.path())
-        .filter(|x| is_ext_compatible(x))
-        .collect::<Vec<PathBuf>>();
 
     if randomize {
         let mut rng = rand::thread_rng();
@@ -104,7 +118,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
     if !folder_path.is_dir() {
         bail!("This is not a folder");
     };
-    get_image_filenames_for_directory(folder_path, false).map(|x| {
+    get_image_filenames_for_directory(folder_path, false, false).map(|x| {
         x.first()
             .cloned()
             .context("Folder does not have any supported images in it")

@@ -64,6 +64,7 @@ pub struct OculanteState {
     pub scrubber: Scrubber,
     pub checker_texture: Option<Texture>,
     pub animation_mode: bool,
+    pub folder_selected: bool,
 }
 
 impl OculanteState {
@@ -114,6 +115,7 @@ impl Default for OculanteState {
             scrubber: Default::default(),
             checker_texture: Default::default(),
             animation_mode: Default::default(),
+            folder_selected: Default::default(),
         }
     }
 }
