@@ -64,7 +64,7 @@ pub struct OculanteState {
     pub scrubber: Scrubber,
     pub checker_texture: Option<Texture>,
     pub animation_mode: bool,
-    pub folder_selected: bool,
+    pub folder_selected: Option<PathBuf>,
 }
 
 impl OculanteState {

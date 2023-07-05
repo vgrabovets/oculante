@@ -660,7 +660,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         set_title(app, state);
 
         // fill image sequence
-        if !state.folder_selected {
+        if state.folder_selected.is_none() {
             if let Some(p) = &state.current_path {
                 state.scrubber = scrubber::Scrubber::new(p, false, false);
                 state.scrubber.wrap = state.persistent_settings.wrap_folder;
@@ -1030,7 +1030,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
 
     if let Some(file_path) = file_dialog_result {
         debug!("Selected File Path = {:?}", file_path);
-        state.folder_selected = false;
+        state.folder_selected = None;
         state.is_loaded = false;
         state.current_image = None;
         state
@@ -1054,7 +1054,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
     if let Some(folder_path) = folder_dialog_result {
         state.persistent_settings.last_open_directory = folder_path.clone();
         _ = state.persistent_settings.save();
-        state.folder_selected = true;
+        state.folder_selected = Option::from(folder_path.clone());
 
         state.scrubber = Scrubber::new(folder_path.as_path(), true, true);
         let current_path = state.scrubber.next();
@@ -1107,7 +1107,12 @@ fn add_to_favourites(state: &OculanteState) {
         let mut file = fs::OpenOptions::new()
             .append(true)
             .create(true)
-            .open(img_path.parent().unwrap().join(Path::new("favourites.txt")))
+            .open(
+                state.folder_selected
+                    .as_ref()
+                    .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+                    .join(Path::new("favourites.txt"))
+            )
             .expect("Unable to open file");
 
         writeln!(file, "{}", img_path.to_string_lossy()).expect("Unable to write data");
