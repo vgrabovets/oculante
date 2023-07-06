@@ -1115,6 +1115,12 @@ fn add_to_favourites(state: &OculanteState) {
             )
             .expect("Unable to open file");
 
-        writeln!(file, "{}", img_path.to_string_lossy()).expect("Unable to write data");
+        writeln!(
+            file,
+            "{}",
+            img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
+                .unwrap()
+                .to_string_lossy()
+        ).expect("Unable to write data");
     }
 }
