@@ -1118,7 +1118,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                         set_title(app, state);
                                     }
                                     Err(e) => {
-                                        state.send_message(&format!("Error: Could not save: {e}"));
+                                        state.send_message_err(&format!("Error: Could not save: {e}"));
                                     }
                                 }
                                 state.toast_cooldown = 0.0;
@@ -1704,29 +1704,33 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             }
         }
 
-        if state.current_image.is_some() {
-            if state.current_path.is_some() {
-                if tooltip(
-                    unframed_button("◀", ui),
-                    "Previous image",
-                    &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
-                    ui,
-                )
-                .clicked()
-                {
-                    prev_image(state)
-                }
-                if tooltip(
-                    unframed_button("▶", ui),
-                    "Next image",
-                    &lookup(&state.persistent_settings.shortcuts, &NextImage),
-                    ui,
-                )
-                .clicked()
-                {
-                    next_image(state)
-                }
+
+
+        if state.current_path.is_some() {
+            if tooltip(
+                unframed_button("◀", ui),
+                "Previous image",
+                &lookup(&state.persistent_settings.shortcuts, &PreviousImage),
+                ui,
+            )
+            .clicked()
+            {
+                prev_image(state)
             }
+            if tooltip(
+                unframed_button("▶", ui),
+                "Next image",
+                &lookup(&state.persistent_settings.shortcuts, &NextImage),
+                ui,
+            )
+            .clicked()
+            {
+                next_image(state)
+            }
+        }
+
+        if state.current_image.is_some() {
+       
 
             if tooltip(
                 // ui.checkbox(&mut state.info_enabled, "ℹ Info"),
@@ -1866,7 +1870,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                                 state.send_message("Image pasted");
                             }
                         } else {
-                            state.send_message("Clipboard did not contain image")
+                            state.send_message_err("Clipboard did not contain image")
                         }
                     }
                     ui.close_menu();

@@ -20,6 +20,26 @@ pub struct ImageGeometry {
     pub offset: Vector2<f32>,
 }
 
+#[derive(Debug, Clone)]
+pub enum Message {
+    Info(String),
+    Warning(String),
+    Error(String),
+    LoadError(String),
+}
+
+impl Message {
+    pub fn info(m: &str) -> Self {
+        Self::Info(m.into())
+    }
+    pub fn warn(m: &str) -> Self {
+        Self::Warning(m.into())
+    }
+    pub fn err(m: &str) -> Self {
+        Self::Error(m.into())
+    }
+}
+
 /// The state of the application
 #[derive(Debug, AppState)]
 pub struct OculanteState {
@@ -27,7 +47,7 @@ pub struct OculanteState {
     pub compare_list: HashMap<PathBuf, ImageGeometry>,
     pub drag_enabled: bool,
     pub reset_image: bool,
-    pub message: Option<String>,
+    pub message: Option<Message>,
     /// Is the image fully loaded?
     pub is_loaded: bool,
     pub window_size: Vector2<f32>,
@@ -37,7 +57,7 @@ pub struct OculanteState {
     pub sampled_color: [f32; 4],
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
-    pub message_channel: (Sender<String>, Receiver<String>),
+    pub message_channel: (Sender<Message>, Receiver<Message>),
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     pub extended_info_loading: bool,
     /// The Player, responsible for loading and sending Frames
@@ -65,11 +85,16 @@ pub struct OculanteState {
     pub checker_texture: Option<Texture>,
     pub animation_mode: bool,
     pub folder_selected: Option<PathBuf>,
+    pub first_start: bool
 }
 
 impl OculanteState {
     pub fn send_message(&self, msg: &str) {
-        _ = self.message_channel.0.send(msg.into());
+        _ = self.message_channel.0.send(Message::info(msg));
+    }
+
+    pub fn send_message_err(&self, msg: &str) {
+        _ = self.message_channel.0.send(Message::err(msg));
     }
 }
 
@@ -116,6 +141,7 @@ impl Default for OculanteState {
             checker_texture: Default::default(),
             animation_mode: Default::default(),
             folder_selected: Default::default(),
+            first_start: true,
         }
     }
 }

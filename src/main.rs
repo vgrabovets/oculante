@@ -28,6 +28,7 @@ use crate::shortcuts::InputEvent::*;
 mod utils;
 use utils::*;
 mod appstate;
+mod image_loader;
 use appstate::*;
 // mod events;
 #[cfg(target_os = "macos")]
@@ -120,6 +121,7 @@ fn main() -> Result<(), String> {
             error!("Could not load settings: {e}");
         }
     }
+    window_config.always_on_top = true;
 
     info!("Starting oculante.");
     notan::init_with(init)
@@ -224,7 +226,7 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
     if let Some(port) = matches.value_of("l") {
         match port.parse::<i32>() {
             Ok(p) => {
-                state.message = Some(format!("Listening on {p}"));
+                state.message = Some(Message::info(&format!("Listening on {p}")));
                 recv(p, state.texture_channel.0.clone());
                 state.current_path = Some(PathBuf::from(&format!("network port {p}")));
                 state.network_mode = true;
@@ -271,14 +273,12 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         );
 
         let accent_color = style.visuals.selection.bg_fill.to_array();
-        debug!("Luma {:?}", accent_color);
 
         let accent_color_luma = (accent_color[0] as f32 * 0.299
             + accent_color[1] as f32 * 0.587
             + accent_color[2] as f32 * 0.114)
             .max(0.)
             .min(255.) as u8;
-        debug!("Luma {accent_color_luma}");
         let accent_color_luma = if accent_color_luma < 80 { 220 } else { 80 };
         // Set text on highlighted elements
         style.visuals.selection.stroke = Stroke::new(2.0, Color32::from_gray(accent_color_luma));
@@ -360,13 +360,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, Favourite) {
                 add_to_favourites(state);
             }
-
             if key_pressed(app, state, Quit) {
-                // std::process::exit(0)
                 state.persistent_settings.save_blocking();
                 app.backend.exit();
             }
-
             #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateRight) {
                 debug!("Lossless rotate right");
@@ -388,7 +385,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-
             #[cfg(feature = "turbo")]
             if key_pressed(app, state, LosslessRotateLeft) {
                 debug!("Lossless rotate left");
@@ -411,12 +407,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                 }
             }
-
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
-
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
                     next_image(state)
@@ -433,12 +427,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, LastImage) {
                 last_image(state)
             }
-
             if key_pressed(app, state, AlwaysOnTop) {
                 state.always_on_top = !state.always_on_top;
                 app.window().set_always_on_top(state.always_on_top);
             }
-
             if key_pressed(app, state, InfoMode) {
                 state.persistent_settings.info_enabled = !state.persistent_settings.info_enabled;
                 send_extended_info(
@@ -447,11 +439,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     &state.extended_info_channel,
                 );
             }
-
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -471,7 +461,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.image_geometry.scale += delta;
                 }
             }
-
             if key_pressed(app, state, ZoomOut) {
                 let delta = zoomratio(-3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -545,10 +534,16 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
         Event::Drop(file) => {
             if let Some(p) = file.path {
-                state.is_loaded = false;
-                state.current_image = None;
-                state.player.load(&p, state.message_channel.0.clone());
-                state.current_path = Some(p);
+                if let Some(ext) = p.extension() {
+                    if SUPPORTED_EXTENSIONS.contains(&ext.to_string_lossy().to_string().as_str()) {
+                        state.is_loaded = false;
+                        state.current_image = None;
+                        state.player.load(&p, state.message_channel.0.clone());
+                        state.current_path = Some(p);
+                    } else {
+                        state.message = Some(Message::warn("Unsupported file!"));
+                    }
+                }
             }
         }
         Event::MouseDown { button, .. } => {
@@ -576,6 +571,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 }
 
 fn update(app: &mut App, state: &mut OculanteState) {
+    if state.first_start {
+        app.window().set_always_on_top(false);
+    }
+
+
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
@@ -600,11 +600,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
             ),
             state.image_geometry.scale,
         );
-    }
-
-    // redraw constantly until the image is fully loaded or it is reset on canvas
-    if !state.is_loaded || state.reset_image {
-        app.window().request_frame();
     }
 
     // make sure that in edit mode, RGBA is set.
@@ -634,15 +629,21 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
         // check if a new message has been sent
         if let Ok(msg) = state.message_channel.1.try_recv() {
-            debug!("Received message: {msg}");
-            if msg.to_lowercase().contains("error") || msg.to_lowercase().contains("unsupported") {
-                if state.current_image.is_none() {
-                    state.current_path = None;
-                }
+            debug!("Received message: {:?}", msg);
+            match msg {
+                Message::LoadError(_) => {
+                    state.current_image = None;
+                    state.is_loaded = true;
+                    state.current_texture = None;
+                },
+                _ => (),
             }
+
             state.message = Some(msg);
         }
     }
+    state.first_start = false;
+
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -797,7 +798,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             debug!("Image has been reset.");
             state.reset_image = false;
         }
-        app.window().request_frame();
+        // app.window().request_frame();
     }
 
     // TODO: Do we need/want a "global" checker?
@@ -923,22 +924,32 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 ctx,
                 state.message.is_some(),
                 |ui| {
-                    ui.ctx().request_repaint();
-
                     ui.horizontal(|ui| {
-                        ui.label(format!("💬 {message}"));
+                        match message {
+                            Message::Info(txt) => {
+                                ui.label(format!("💬 {txt}"));
+                            }
+                            Message::Warning(txt) => {
+                                ui.colored_label(Color32::GOLD, format!("⚠ {txt}"));
+                            }
+                            Message::Error(txt) | Message::LoadError(txt) => {
+                                ui.colored_label(Color32::RED, format!("🕱 {txt}"));
+                            }
+                        }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             if ui.small_button("🗙").clicked() {
                                 state.message = None
                             }
                         });
                     });
+
+                    ui.ctx().request_repaint();
                 },
             );
             let max_anim_len = if state.persistent_settings.vsync {
-                3.5
+                2.5
             } else {
-                70.
+                50.
             };
 
             // using delta does not work with rfd
@@ -977,9 +988,9 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             ui.label(format!("Loading {}", p.display()));
                         });
                     }
+                    app.window().request_frame();
                 },
             );
-            app.window().request_frame();
         }
 
         state.pointer_over_ui = ctx.is_pointer_over_area();
@@ -1009,7 +1020,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     //     app.window().request_frame();
     // }
     let c = state.persistent_settings.background_color;
-    draw.clear(Color::from_bytes(c[0], c[1], c[2], 255));
+    // draw.clear(Color:: from_bytes(c[0], c[1], c[2], 255));
+    draw.clear(Color::from_rgb(
+        c[0] as f32 / 255.,
+        c[1] as f32 / 255.,
+        c[1] as f32 / 255.,
+    ));
     gfx.render(&draw);
     gfx.render(&egui_output);
     if egui_output.needs_repaint() {
