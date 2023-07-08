@@ -1060,6 +1060,7 @@ fn browse_for_image_path(state: &mut OculanteState) {
     }
 }
 
+#[cfg(feature = "file_open")]
 fn browse_for_folder_path(state: &mut OculanteState) {
     let start_directory = &state.persistent_settings.last_open_directory;
 
