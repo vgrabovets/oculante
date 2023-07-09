@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use itertools::Itertools;
 use log::debug;
 use log::error;
 use log::info;
@@ -48,6 +49,7 @@ mod image_editing;
 pub mod paint;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
+const FAVOURITES_FILE: &str = "favourites.txt";
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -663,7 +665,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // fill image sequence
         if state.folder_selected.is_none() {
             if let Some(p) = &state.current_path {
-                state.scrubber = scrubber::Scrubber::new(p, false, false);
+                state.scrubber = scrubber::Scrubber::new(p, None, false, false);
                 state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
                 // debug!("{:#?} from {}", &state.scrubber, p.display());
@@ -1073,7 +1075,12 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         _ = state.persistent_settings.save();
         state.folder_selected = Option::from(folder_path.clone());
 
-        state.scrubber = Scrubber::new(folder_path.as_path(), true, true);
+        state.scrubber = Scrubber::new(
+            folder_path.as_path(),
+            Some(FAVOURITES_FILE),
+            true,
+            true,
+        );
         let current_path = state.scrubber.next();
 
         state.is_loaded = false;
@@ -1128,7 +1135,7 @@ fn add_to_favourites(state: &OculanteState) {
                 state.folder_selected
                     .as_ref()
                     .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                    .join(Path::new("favourites.txt"))
+                    .join(Path::new(FAVOURITES_FILE))
             )
             .expect("Unable to open file");
 
@@ -1137,7 +1144,9 @@ fn add_to_favourites(state: &OculanteState) {
             "{}",
             img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
                 .unwrap()
-                .to_string_lossy()
+                .components()
+                .map(|component| component.as_os_str().to_str().unwrap())
+                .join("\t")
         ).expect("Unable to write data");
     }
 }
