@@ -21,7 +21,7 @@ jobs:
       id: create_release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
@@ -114,7 +114,7 @@ jobs:
       id: upload-release-asset-lin-classic
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante
@@ -126,7 +126,7 @@ jobs:
       id: upload-release-arm
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_armv7_minimal.zip
@@ -138,7 +138,7 @@ jobs:
       id: upload-release-arm64
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_aarch64_minimal.zip
@@ -150,7 +150,7 @@ jobs:
       id: upload-release-asset-lin-classic-zip
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_linux.zip
@@ -162,7 +162,7 @@ jobs:
       id: upload-release-asset-lin-classic-zip-min
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_linux_minimal.zip
@@ -174,7 +174,7 @@ jobs:
       id: upload-release-asset-lin-classic-deb
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante.deb
@@ -186,7 +186,7 @@ jobs:
       id: upload-release-asset-mac
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: oculante_app.zip
@@ -198,7 +198,7 @@ jobs:
       id: upload-release-asset-bin
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante
@@ -210,7 +210,7 @@ jobs:
       id: upload-release-asset-windows-classic
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         upload_url: ${{ needs.release_job.outputs.upload_url }}
         asset_path: target/release/oculante.exe
@@ -229,7 +229,7 @@ jobs:
     - name: Publish
       uses: eregon/publish-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.TOKEN }}
       with:
         release_id: ${{ needs.release_job.outputs.release_id }}
 
