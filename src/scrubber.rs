@@ -15,8 +15,20 @@ pub struct Scrubber {
 }
 
 impl Scrubber {
-    pub fn new(path: &Path, favourites_file: Option<&str>, randomize: bool, walk_files: bool) -> Self {
-        let entries = get_image_filenames_for_directory(path, favourites_file, randomize, walk_files)
+    pub fn new(
+        path: &Path,
+        favourites_file: Option<&str>,
+        randomize: bool,
+        walk_files: bool,
+        intersperse_with_favs_every_n: Option<usize>,
+    ) -> Self {
+        let entries = get_image_filenames_for_directory(
+            path,
+            favourites_file,
+            randomize,
+            walk_files,
+            intersperse_with_favs_every_n,
+        )
             .unwrap_or_default();
         let index = entries.iter().position(|p| p == path).unwrap_or_default();
         Self {
@@ -66,7 +78,13 @@ impl Scrubber {
 // Get sorted list of files in a folder
 // TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
 // TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
-pub fn get_image_filenames_for_directory(folder_path: &Path, favourites_file: Option<&str>, randomize: bool, walk_files: bool) -> Result<Vec<PathBuf>> {
+pub fn get_image_filenames_for_directory(
+    folder_path: &Path,
+    favourites_file: Option<&str>,
+    randomize: bool,
+    walk_files: bool,
+    intersperse_with_favs_every_n: Option<usize>,
+) -> Result<Vec<PathBuf>> {
     let mut folder_path = folder_path.to_path_buf();
     if folder_path.is_file() {
         folder_path = folder_path
@@ -75,14 +93,14 @@ pub fn get_image_filenames_for_directory(folder_path: &Path, favourites_file: Op
             .context("Can't get parent")?;
     }
 
-    let mut _favourites: HashSet<PathBuf> = Default::default();
+    let mut favourites: HashSet<PathBuf> = Default::default();
 
     if let Some(favourites_file) = favourites_file {
         let favourites_path = folder_path.join(Path::new(favourites_file));
         if favourites_path.exists() {
             let file = std::fs::File::open(favourites_path)?;
             let reader = BufReader::new(file);
-            _favourites = reader
+            favourites = reader
                 .lines()
                 .filter_map(|line| line.ok())
                 .map(|file_str| folder_path.join(join_path_parts(file_str)))
@@ -97,8 +115,8 @@ pub fn get_image_filenames_for_directory(folder_path: &Path, favourites_file: Op
         dir_files = WalkDir::new(folder_path)
             .into_iter()
             .filter_map(|v| v.ok())
-            .filter(|x| is_ext_compatible(x.path()))
-            .map(|x| x.into_path())
+            .map(|entry| entry.into_path())
+            .filter(|x| is_ext_compatible(x))
             .collect::<Vec<PathBuf>>();
     } else {
         let info = std::fs::read_dir(folder_path)?;
@@ -109,13 +127,14 @@ pub fn get_image_filenames_for_directory(folder_path: &Path, favourites_file: Op
             .collect::<Vec<PathBuf>>();
     }
 
-    debug!("number of files: {}", dir_files.len());
-
     // TODO: Are symlinks handled correctly?
+
+    let mut favourites: Vec<PathBuf> = favourites.into_iter().collect();
 
     if randomize {
         let mut rng = rand::thread_rng();
         dir_files.shuffle(&mut rng);
+        favourites.shuffle(&mut rng);
     } else {
         dir_files.sort_unstable_by(|a, b| {
             lexical_sort::natural_lexical_cmp(
@@ -129,6 +148,10 @@ pub fn get_image_filenames_for_directory(folder_path: &Path, favourites_file: Op
         });
     }
 
+    if let Some(every_n) = intersperse_with_favs_every_n {
+        dir_files = insert_after_every(dir_files, favourites, every_n);
+    }
+    debug!("number of files: {}", dir_files.len());
     return Ok(dir_files);
 }
 
@@ -138,7 +161,14 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
     if !folder_path.is_dir() {
         bail!("This is not a folder");
     };
-    get_image_filenames_for_directory(folder_path, None, false, false).map(|x| {
+    get_image_filenames_for_directory(
+        folder_path,
+        None,
+        false,
+        false,
+        None,
+    )
+        .map(|x| {
         x.first()
             .cloned()
             .context("Folder does not have any supported images in it")
@@ -153,4 +183,29 @@ fn join_path_parts(path_with_tabs: String) -> PathBuf {
     }
 
     path
+}
+
+fn insert_after_every(main_vector: Vec<PathBuf>, other_vector: Vec<PathBuf>, after: usize) -> Vec<PathBuf> {
+    let mut result = Vec::with_capacity(main_vector.len() + other_vector.len());
+    let mut other_vector_i = 0;
+    let other_vector_set: HashSet<PathBuf> = other_vector.clone().into_iter().collect();
+
+    for (i, element) in main_vector.into_iter().enumerate() {
+        if other_vector_set.contains(&element) {
+            continue
+        }
+
+        result.push(element);
+        if other_vector_i < other_vector.len() && (i + 1) % after == 0 {
+            result.push(other_vector[other_vector_i].clone());
+            other_vector_i += 1;
+        }
+    }
+
+    while other_vector_i < other_vector.len() {
+        result.push(other_vector[other_vector_i].clone());
+        other_vector_i += 1;
+    }
+
+    result
 }

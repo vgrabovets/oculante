@@ -665,7 +665,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // fill image sequence
         if state.folder_selected.is_none() {
             if let Some(p) = &state.current_path {
-                state.scrubber = scrubber::Scrubber::new(p, None, false, false);
+                state.scrubber = scrubber::Scrubber::new(p, None, false, false, None);
                 state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
                 // debug!("{:#?} from {}", &state.scrubber, p.display());
@@ -1080,6 +1080,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
             Some(FAVOURITES_FILE),
             true,
             true,
+            Some(3),
         );
         let current_path = state.scrubber.next();
 
