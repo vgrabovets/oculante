@@ -18,6 +18,8 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use tokio;
+use tokio::time::{sleep, Duration};
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -52,7 +54,8 @@ pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf")
 const FAVOURITES_FILE: &str = "favourites.txt";
 
 #[notan_main]
-fn main() -> Result<(), String> {
+#[tokio::main]
+async fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
     }
@@ -361,6 +364,18 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, Favourite) {
                 add_to_favourites(state);
+            }
+            if key_pressed(app, state, StartSlideshow) {
+                if state.is_loaded {
+                    tokio::spawn(async {
+                        loop {
+                            next_image(state);
+                            debug!("sleep");
+                            sleep(Duration::from_secs(2)).await;
+                            // thread::sleep(Duration::from_secs(2));
+                        }
+                    });
+                }
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
@@ -797,7 +812,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.image_geometry.offset =
                 window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
 
-            debug!("Image has been reset.");
             state.reset_image = false;
         }
         // app.window().request_frame();
