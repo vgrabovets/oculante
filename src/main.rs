@@ -2,6 +2,7 @@
 
 use clap::Arg;
 use clap::Command;
+use enigo::{self, Enigo, KeyboardControllable};
 use itertools::Itertools;
 use log::debug;
 use log::error;
@@ -368,11 +369,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, StartSlideshow) {
                 if state.is_loaded {
                     tokio::spawn(async {
+                        let mut enigo = Enigo::new();
                         loop {
-                            next_image(state);
-                            debug!("sleep");
+                            enigo.key_click(enigo::Key::RightArrow);
                             sleep(Duration::from_secs(2)).await;
-                            // thread::sleep(Duration::from_secs(2));
                         }
                     });
                 }

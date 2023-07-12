@@ -25,6 +25,7 @@ avif-decode = {version = "0.2", optional = true}
 clap = "3.2"
 dds-rs = "0.7"
 dirs = "5.0"
+enigo = "0.1.2"
 env_logger = "0.10"
 evalexpr = "8.2"
 exr = "1.6"
