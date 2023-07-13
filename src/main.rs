@@ -2,7 +2,6 @@
 
 use clap::Arg;
 use clap::Command;
-use enigo::{self, Enigo, KeyboardControllable};
 use itertools::Itertools;
 use log::debug;
 use log::error;
@@ -19,8 +18,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
-use tokio;
-use tokio::time::{sleep, Duration};
+use std::time::{Duration, Instant};
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -55,8 +53,7 @@ pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf")
 const FAVOURITES_FILE: &str = "favourites.txt";
 
 #[notan_main]
-#[tokio::main]
-async fn main() -> Result<(), String> {
+fn main() -> Result<(), String> {
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
     }
@@ -85,17 +82,17 @@ async fn main() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config.lazy_loop(false).vsync(true).high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true);
+        window_config = window_config.lazy_loop(false).vsync(true);
     }
 
     #[cfg(target_os = "macos")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config.lazy_loop(false).vsync(true).high_dpi(true);
     }
 
     #[cfg(target_os = "macos")]
@@ -366,16 +363,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, Favourite) {
                 add_to_favourites(state);
             }
-            if key_pressed(app, state, StartSlideshow) {
-                if state.is_loaded {
-                    tokio::spawn(async {
-                        let mut enigo = Enigo::new();
-                        loop {
-                            enigo.key_click(enigo::Key::RightArrow);
-                            sleep(Duration::from_secs(2)).await;
-                        }
-                    });
-                }
+            if key_pressed(app, state, ToggleSlideshow) {
+                state.toggle_slideshow = !state.toggle_slideshow;
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
@@ -661,6 +650,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
     state.first_start = false;
 
+    if state.toggle_slideshow && state.is_loaded && state.slideshow_time.elapsed() >= Duration::from_secs(2) {
+        next_image(state);
+        state.slideshow_time = Instant::now();
+    }
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
