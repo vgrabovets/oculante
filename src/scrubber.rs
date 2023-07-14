@@ -3,6 +3,7 @@ use anyhow::{bail, Context, Result};
 use log::debug;
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
+use std::default::Default;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -12,6 +13,7 @@ pub struct Scrubber {
     pub index: usize,
     pub entries: Vec<PathBuf>,
     pub wrap: bool,
+    pub favourites: HashSet<PathBuf>,
 }
 
 impl Scrubber {
@@ -22,7 +24,7 @@ impl Scrubber {
         walk_files: bool,
         intersperse_with_favs_every_n: Option<usize>,
     ) -> Self {
-        let entries = get_image_filenames_for_directory(
+        let (entries, favourites) = get_image_filenames_for_directory(
             path,
             favourites_file,
             randomize,
@@ -35,6 +37,7 @@ impl Scrubber {
             index,
             entries,
             wrap: true,
+            favourites,
         }
     }
     pub fn next(&mut self) -> PathBuf {
@@ -84,7 +87,7 @@ pub fn get_image_filenames_for_directory(
     randomize: bool,
     walk_files: bool,
     intersperse_with_favs_every_n: Option<usize>,
-) -> Result<Vec<PathBuf>> {
+) -> Result<(Vec<PathBuf>, HashSet<PathBuf>)> {
     let mut folder_path = folder_path.to_path_buf();
     if folder_path.is_file() {
         folder_path = folder_path
@@ -129,12 +132,12 @@ pub fn get_image_filenames_for_directory(
 
     // TODO: Are symlinks handled correctly?
 
-    let mut favourites: Vec<PathBuf> = favourites.into_iter().collect();
+    let mut favourites_vec: Vec<PathBuf> = favourites.clone().into_iter().collect();
 
     if randomize {
         let mut rng = rand::thread_rng();
         dir_files.shuffle(&mut rng);
-        favourites.shuffle(&mut rng);
+        favourites_vec.shuffle(&mut rng);
     } else {
         dir_files.sort_unstable_by(|a, b| {
             lexical_sort::natural_lexical_cmp(
@@ -149,10 +152,10 @@ pub fn get_image_filenames_for_directory(
     }
 
     if let Some(every_n) = intersperse_with_favs_every_n {
-        dir_files = insert_after_every(dir_files, favourites, every_n);
+        dir_files = insert_after_every(dir_files, favourites_vec, every_n);
     }
     debug!("number of files: {}", dir_files.len());
-    return Ok(dir_files);
+    return Ok((dir_files, favourites));
 }
 
 /// Find first valid image from the directory
@@ -168,7 +171,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
         false,
         None,
     )
-        .map(|x| {
+        .map(|(x, _)| {
         x.first()
             .cloned()
             .context("Folder does not have any supported images in it")
