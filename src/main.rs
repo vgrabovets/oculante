@@ -27,6 +27,7 @@ pub mod shortcuts;
 use crate::image_editing::lossless_tx;
 use crate::scrubber::{find_first_image_in_directory, Scrubber};
 use crate::shortcuts::InputEvent::*;
+use crate::utils::set_title;
 mod utils;
 use utils::*;
 mod appstate;
@@ -361,7 +362,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 set_zoom(5.0, None, state);
             }
             if key_pressed(app, state, Favourite) {
-                add_to_favourites(state);
+                add_to_favourites(app, state);
             }
             if key_pressed(app, state, ToggleSlideshow) {
                 state.toggle_slideshow = !state.toggle_slideshow;
@@ -1134,27 +1135,32 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
     state.image_geometry.scale = scale;
 }
 
-fn add_to_favourites(state: &OculanteState) {
+fn add_to_favourites(app: &mut App, state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(
-                state.folder_selected
-                    .as_ref()
-                    .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                    .join(Path::new(FAVOURITES_FILE))
-            )
-            .expect("Unable to open file");
+        if !state.scrubber.favourites.contains(img_path) {
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(
+                    state.folder_selected
+                        .as_ref()
+                        .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+                        .join(Path::new(FAVOURITES_FILE))
+                )
+                .expect("Unable to open file");
 
-        writeln!(
-            file,
-            "{}",
-            img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
-                .unwrap()
-                .components()
-                .map(|component| component.as_os_str().to_str().unwrap())
-                .join("\t")
-        ).expect("Unable to write data");
+            writeln!(
+                file,
+                "{}",
+                img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
+                    .unwrap()
+                    .components()
+                    .map(|component| component.as_os_str().to_str().unwrap())
+                    .join("\t")
+            ).expect("Unable to write data");
+
+            state.scrubber.favourites.insert(img_path.clone());
+            set_title(app, state);
+        }
     }
 }
