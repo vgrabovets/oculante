@@ -10,6 +10,7 @@ use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
+    time::Instant,
 };
 
 #[derive(Debug, Clone)]
@@ -85,6 +86,8 @@ pub struct OculanteState {
     pub checker_texture: Option<Texture>,
     pub animation_mode: bool,
     pub folder_selected: Option<PathBuf>,
+    pub toggle_slideshow: bool,
+    pub slideshow_time: Instant,
     pub first_start: bool
 }
 
@@ -141,6 +144,8 @@ impl Default for OculanteState {
             checker_texture: Default::default(),
             animation_mode: Default::default(),
             folder_selected: Default::default(),
+            toggle_slideshow: false,
+            slideshow_time: Instant::now(),
             first_start: true,
         }
     }

@@ -18,6 +18,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -26,6 +27,7 @@ pub mod shortcuts;
 use crate::image_editing::lossless_tx;
 use crate::scrubber::{find_first_image_in_directory, Scrubber};
 use crate::shortcuts::InputEvent::*;
+use crate::utils::set_title;
 mod utils;
 use utils::*;
 mod appstate;
@@ -81,17 +83,17 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config.lazy_loop(false).vsync(true).high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true);
+        window_config = window_config.lazy_loop(false).vsync(true);
     }
 
     #[cfg(target_os = "macos")]
     {
-        window_config = window_config.lazy_loop(true).vsync(true).high_dpi(true);
+        window_config = window_config.lazy_loop(false).vsync(true).high_dpi(true);
     }
 
     #[cfg(target_os = "macos")]
@@ -360,7 +362,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 set_zoom(5.0, None, state);
             }
             if key_pressed(app, state, Favourite) {
-                add_to_favourites(state);
+                add_to_favourites(app, state);
+            }
+            if key_pressed(app, state, ToggleSlideshow) {
+                state.toggle_slideshow = !state.toggle_slideshow;
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
@@ -646,6 +651,10 @@ fn update(app: &mut App, state: &mut OculanteState) {
     }
     state.first_start = false;
 
+    if state.toggle_slideshow && state.is_loaded && state.slideshow_time.elapsed() >= Duration::from_secs(2) {
+        next_image(state);
+        state.slideshow_time = Instant::now();
+    }
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -797,7 +806,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.image_geometry.offset =
                 window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
 
-            debug!("Image has been reset.");
             state.reset_image = false;
         }
         // app.window().request_frame();
@@ -1127,27 +1135,32 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
     state.image_geometry.scale = scale;
 }
 
-fn add_to_favourites(state: &OculanteState) {
+fn add_to_favourites(app: &mut App, state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(
-                state.folder_selected
-                    .as_ref()
-                    .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                    .join(Path::new(FAVOURITES_FILE))
-            )
-            .expect("Unable to open file");
+        if !state.scrubber.favourites.contains(img_path) {
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(
+                    state.folder_selected
+                        .as_ref()
+                        .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+                        .join(Path::new(FAVOURITES_FILE))
+                )
+                .expect("Unable to open file");
 
-        writeln!(
-            file,
-            "{}",
-            img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
-                .unwrap()
-                .components()
-                .map(|component| component.as_os_str().to_str().unwrap())
-                .join("\t")
-        ).expect("Unable to write data");
+            writeln!(
+                file,
+                "{}",
+                img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
+                    .unwrap()
+                    .components()
+                    .map(|component| component.as_os_str().to_str().unwrap())
+                    .join("\t")
+            ).expect("Unable to write data");
+
+            state.scrubber.favourites.insert(img_path.clone());
+            set_title(app, state);
+        }
     }
 }
