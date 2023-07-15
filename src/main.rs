@@ -1093,6 +1093,8 @@ fn browse_for_folder_path(state: &mut OculanteState) {
             true,
             state.persistent_settings.add_fav_every_n,
         );
+        let number_of_files = state.scrubber.len();
+        state.send_message(format!("number of files: {}", number_of_files).as_str());
         let current_path = state.scrubber.next();
 
         state.is_loaded = false;

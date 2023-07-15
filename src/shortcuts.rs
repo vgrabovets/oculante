@@ -258,7 +258,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 for pressed in &app.keyboard.pressed {
                     // debug!("{:?}", pressed);
                     if format!("{:?}", pressed) == key {
-                        debug!("Number of keys pressed: {}", app.keyboard.down.len());
                         debug!("Matched {:?} / {:?}", command, key);
                         return true;
                     }
