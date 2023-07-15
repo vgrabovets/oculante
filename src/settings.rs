@@ -18,6 +18,8 @@ pub struct PersistentSettings {
     pub keep_view: bool,
     /// How many images to keep in cache
     pub max_cache: usize,
+    pub slideshow_delay: u64,
+    pub add_fav_every_n: usize,
     pub show_scrub_bar: bool,
     pub wrap_folder: bool,
     /// Whether to keep the image edit stack
@@ -48,6 +50,8 @@ impl Default for PersistentSettings {
             shortcuts: Shortcuts::default_keys(),
             keep_view: Default::default(),
             max_cache: 30,
+            slideshow_delay: 3,
+            add_fav_every_n: 3,
             show_scrub_bar: Default::default(),
             wrap_folder: true,
             keep_edits: Default::default(),

@@ -22,7 +22,7 @@ impl Scrubber {
         favourites_file: Option<&str>,
         randomize: bool,
         walk_files: bool,
-        intersperse_with_favs_every_n: Option<usize>,
+        intersperse_with_favs_every_n: usize,
     ) -> Self {
         let (entries, favourites) = get_image_filenames_for_directory(
             path,
@@ -76,6 +76,17 @@ impl Scrubber {
     pub fn len(&mut self) -> usize {
         self.entries.len()
     }
+
+    pub fn re_initialize(&mut self, intersperse_with_favs_every_n: usize) {
+        let entries_wo_favourites: Vec<PathBuf> = self.entries
+            .iter()
+            .filter(|element| !self.favourites.contains(*element))
+            .map(|element| element.clone())
+            .collect();
+
+        let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
+        self.entries = insert_after_every(entries_wo_favourites, favourites_vec, intersperse_with_favs_every_n);
+    }
 }
 
 // Get sorted list of files in a folder
@@ -86,7 +97,7 @@ pub fn get_image_filenames_for_directory(
     favourites_file: Option<&str>,
     randomize: bool,
     walk_files: bool,
-    intersperse_with_favs_every_n: Option<usize>,
+    intersperse_with_favs_every_n: usize,
 ) -> Result<(Vec<PathBuf>, HashSet<PathBuf>)> {
     let mut folder_path = folder_path.to_path_buf();
     if folder_path.is_file() {
@@ -151,8 +162,8 @@ pub fn get_image_filenames_for_directory(
         });
     }
 
-    if let Some(every_n) = intersperse_with_favs_every_n {
-        dir_files = insert_after_every(dir_files, favourites_vec, every_n);
+    if intersperse_with_favs_every_n > 0 {
+        dir_files = insert_after_every(dir_files, favourites_vec, intersperse_with_favs_every_n);
     }
     debug!("number of files: {}", dir_files.len());
     return Ok((dir_files, favourites));
@@ -169,7 +180,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
         None,
         false,
         false,
-        None,
+        0,
     )
         .map(|(x, _)| {
         x.first()

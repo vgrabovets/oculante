@@ -148,7 +148,6 @@ impl Player {
     }
 
     pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
-        debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;

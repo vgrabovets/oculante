@@ -509,10 +509,29 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                     }
                 });
 
+                ui.end_row();
+
+                ui.horizontal(|ui| {
+                    ui.label("Slideshow delay");
+                    ui
+                        .add(egui::DragValue::new(&mut state.persistent_settings.slideshow_delay).clamp_range(1..=10))
+                        .on_hover_text("Slideshow delay, seconds")
+                });
+
+                ui.horizontal(|ui| {
+                    ui.label("Add favourite every n slides");
+                    if ui
+                        .add(egui::DragValue::new(&mut state.persistent_settings.add_fav_every_n).clamp_range(0..=25))
+                        .on_hover_text("Add favourite to slideshow every n slide")
+                        .changed()
+                    {
+                        state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
+                    }
+                });
+
                 if ui.link("Visit github repo").on_hover_text("Check out the source code, request a feature, submit a bug or leave a star if you like it!").clicked() {
                     _ = webbrowser::open("https://github.com/woelper/oculante");
                 }
-
 
                 ui.vertical_centered_justified(|ui| {
 
