@@ -73,6 +73,10 @@ impl Scrubber {
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
+    pub fn get(&mut self, index: usize) -> Option<PathBuf> {
+        self.entries.get(index).cloned()
+    }
+
     pub fn len(&mut self) -> usize {
         self.entries.len()
     }

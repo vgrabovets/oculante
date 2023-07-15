@@ -1094,16 +1094,20 @@ fn browse_for_folder_path(state: &mut OculanteState) {
             state.persistent_settings.add_fav_every_n,
         );
         let number_of_files = state.scrubber.len();
-        state.send_message(format!("number of files: {}", number_of_files).as_str());
-        let current_path = state.scrubber.next();
+        if number_of_files > 0 {
+            state.send_message(format!("number of files: {}", number_of_files).as_str());
+            let current_path = state.scrubber.get(0).unwrap();
 
-        state.is_loaded = false;
-        state.current_image = None;
-        state
-            .player
-            .load(current_path.as_path(), state.message_channel.0.clone());
+            state.is_loaded = false;
+            state.current_image = None;
+            state
+                .player
+                .load(current_path.as_path(), state.message_channel.0.clone());
 
-        state.current_path = Some(current_path);
+            state.current_path = Some(current_path);
+        } else {
+            state.send_message_err(format!("No supported image files in {:?}", folder_path).as_str());
+        }
     }
 }
 
