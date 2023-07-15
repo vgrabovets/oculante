@@ -990,7 +990,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        if !state.is_loaded {
+        if !state.is_loaded && !state.toggle_slideshow {
             egui::TopBottomPanel::bottom("loader").show_animated(
                 ctx,
                 state.current_path.is_some(),
@@ -1170,6 +1170,8 @@ fn add_to_favourites(app: &mut App, state: &mut OculanteState) {
 
             state.scrubber.favourites.insert(img_path.clone());
             set_title(app, state);
+        } else {
+            state.send_message_err(format!("{:?} is already favourite", img_path).as_str());
         }
     }
 }
