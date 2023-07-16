@@ -418,6 +418,9 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
+            if key_pressed(app, state, BrowseFolder) {
+                browse_for_folder_path(state)
+            }
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
                     next_image(state)
