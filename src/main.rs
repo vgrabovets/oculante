@@ -918,12 +918,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.current_image_is_favourite {
-            draw.star(10, 80.0, 40.0)
-                .position(150.0, 480.0)
-                .fill_color(Color::PINK)
+            draw.star(5, 20.0, 10.0)
+                .position(50.0, 60.0)
+                .fill_color(Color::YELLOW)
                 .fill()
-                .stroke_color(Color::PURPLE)
-                .stroke(6.0);
+                .stroke_color(Color::ORANGE)
+                .stroke(3.0);
         }
     }
 
@@ -1111,8 +1111,15 @@ fn browse_for_folder_path(state: &mut OculanteState) {
             state.persistent_settings.add_fav_every_n,
         );
         let number_of_files = state.scrubber.len();
+        let number_of_favs = state.scrubber.favourites.len();
         if number_of_files > 0 {
-            state.send_message(format!("number of files: {}", number_of_files).as_str());
+            state.send_message(
+                format!(
+                    "number of files: {}, number of favourites: {}",
+                    number_of_files,
+                    number_of_favs,
+                ).as_str(),
+            );
             let current_path = state.scrubber.get(0).unwrap();
 
             state.is_loaded = false;
