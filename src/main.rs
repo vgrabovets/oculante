@@ -418,6 +418,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, Browse) {
                 browse_for_image_path(state)
             }
+            #[cfg(feature = "file_open")]
             if key_pressed(app, state, BrowseFolder) {
                 browse_for_folder_path(state)
             }
