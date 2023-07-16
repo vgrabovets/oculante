@@ -671,10 +671,6 @@ pub fn set_title(app: &mut App, state: &mut OculanteState) {
             10,
         );
 
-    if state.scrubber.favourites.contains(p.as_path()) {
-        title_string.push_str("🔖");
-    }
-
     if state.persistent_settings.zen_mode {
         title_string.push_str(&format!(
             "          '{}' to disable zen mode",

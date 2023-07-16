@@ -88,6 +88,7 @@ pub struct OculanteState {
     pub folder_selected: Option<PathBuf>,
     pub toggle_slideshow: bool,
     pub slideshow_time: Instant,
+    pub current_image_is_favourite: bool,
     pub first_start: bool
 }
 
@@ -146,6 +147,7 @@ impl Default for OculanteState {
             folder_selected: Default::default(),
             toggle_slideshow: false,
             slideshow_time: Instant::now(),
+            current_image_is_favourite: Default::default(),
             first_start: true,
         }
     }

@@ -362,7 +362,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 set_zoom(5.0, None, state);
             }
             if key_pressed(app, state, Favourite) {
-                add_to_favourites(app, state);
+                add_to_favourites(state);
             }
             if key_pressed(app, state, ToggleSlideshow) {
                 state.toggle_slideshow = !state.toggle_slideshow;
@@ -674,6 +674,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         set_title(app, state);
 
+        if let Some(current_path) = &state.current_path {
+            if state.scrubber.favourites.contains(current_path) {
+                state.current_image_is_favourite = true;
+            } else {
+                state.current_image_is_favourite = false;
+            }
+        }
+
         // fill image sequence
         if state.folder_selected.is_none() {
             if let Some(p) = &state.current_path {
@@ -907,6 +915,15 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 //     }
                 // }
             }
+        }
+
+        if state.current_image_is_favourite {
+            draw.star(10, 80.0, 40.0)
+                .position(150.0, 480.0)
+                .fill_color(Color::PINK)
+                .fill()
+                .stroke_color(Color::PURPLE)
+                .stroke(6.0);
         }
     }
 
@@ -1144,7 +1161,7 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
     state.image_geometry.scale = scale;
 }
 
-fn add_to_favourites(app: &mut App, state: &mut OculanteState) {
+fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
         if !state.scrubber.favourites.contains(img_path) {
             let mut file = fs::OpenOptions::new()
@@ -1169,7 +1186,7 @@ fn add_to_favourites(app: &mut App, state: &mut OculanteState) {
             ).expect("Unable to write data");
 
             state.scrubber.favourites.insert(img_path.clone());
-            set_title(app, state);
+            state.current_image_is_favourite = true;
         } else {
             state.send_message_err(format!("{:?} is already favourite", img_path).as_str());
         }
