@@ -12,9 +12,8 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use rusqlite::Connection;
 use shortcuts::key_pressed;
-use std::fs;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -51,7 +50,7 @@ mod image_editing;
 pub mod paint;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
-const FAVOURITES_FILE: &str = "favourites.txt";
+const FAVOURITES_DB: &str = "favourites.db";
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -316,8 +315,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::KeyDown { .. } => {
-            debug!("key down");
-
             // return;
             // pan image with keyboard
             let delta = 40.;
@@ -1109,7 +1106,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
 
         state.scrubber = Scrubber::new(
             folder_path.as_path(),
-            Some(FAVOURITES_FILE),
+            Some(FAVOURITES_DB),
             true,
             true,
             state.persistent_settings.add_fav_every_n,
@@ -1119,7 +1116,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         if number_of_files > 0 {
             state.send_message(
                 format!(
-                    "number of files: {}, number of favourites: {}",
+                    "files: {}, favourites: {}",
                     number_of_files,
                     number_of_favs,
                 ).as_str(),
@@ -1175,26 +1172,31 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
         if !state.scrubber.favourites.contains(img_path) {
-            let mut file = fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(
-                    state.folder_selected
-                        .as_ref()
-                        .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                        .join(Path::new(FAVOURITES_FILE))
-                )
-                .expect("Unable to open file");
+            let record = img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
+                .unwrap()
+                .components()
+                .map(|component| component.as_os_str().to_str().unwrap())
+                .join("\t");
 
-            writeln!(
-                file,
-                "{}",
-                img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
-                    .unwrap()
-                    .components()
-                    .map(|component| component.as_os_str().to_str().unwrap())
-                    .join("\t")
-            ).expect("Unable to write data");
+            let conn = Connection::open(
+                state.folder_selected
+                    .as_ref()
+                    .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+                    .join(Path::new(FAVOURITES_DB))
+            )
+                .expect("cannot open DB connection");
+
+            conn.execute(
+                "create table if not exists favourites (
+                path text primary key
+                )",
+                (),
+            ).expect("cannot create table");
+
+            conn.execute(
+                "INSERT INTO favourites (path) values (?1)",
+                [record],
+            ).expect("cannot save record");
 
             state.scrubber.favourites.insert(img_path.clone());
             state.current_image_is_favourite = true;

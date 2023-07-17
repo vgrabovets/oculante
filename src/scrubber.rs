@@ -2,9 +2,9 @@ use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
 use log::debug;
 use rand::seq::SliceRandom;
+use rusqlite::Connection;
 use std::collections::HashSet;
 use std::default::Default;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -98,7 +98,7 @@ impl Scrubber {
 // TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
 pub fn get_image_filenames_for_directory(
     folder_path: &Path,
-    favourites_file: Option<&str>,
+    favourites_db: Option<&str>,
     randomize: bool,
     walk_files: bool,
     intersperse_with_favs_every_n: usize,
@@ -113,15 +113,18 @@ pub fn get_image_filenames_for_directory(
 
     let mut favourites: HashSet<PathBuf> = Default::default();
 
-    if let Some(favourites_file) = favourites_file {
-        let favourites_path = folder_path.join(Path::new(favourites_file));
-        if favourites_path.exists() {
-            let file = std::fs::File::open(favourites_path)?;
-            let reader = BufReader::new(file);
-            favourites = reader
-                .lines()
-                .filter_map(|line| line.ok())
-                .map(|file_str| folder_path.join(join_path_parts(file_str)))
+    if let Some(favourites_db) = favourites_db {
+        let favourites_db = folder_path.join(Path::new(favourites_db));
+
+        if favourites_db.exists() {
+            let conn = Connection::open(favourites_db).expect("cannot open DB");
+
+            let mut stmt = conn.prepare("SELECT path from favourites").expect("cannot prepare query");
+
+            favourites = stmt
+                .query_map((), |row| { Ok(row.get(0)?) })
+                .expect("cannot get data")
+                .map(|e| folder_path.join(join_path_parts(e.unwrap())))
                 .filter(|file| file.exists())
                 .collect();
         }
@@ -169,7 +172,6 @@ pub fn get_image_filenames_for_directory(
     if intersperse_with_favs_every_n > 0 {
         dir_files = insert_after_every(dir_files, favourites_vec, intersperse_with_favs_every_n);
     }
-    debug!("number of files: {}", dir_files.len());
     return Ok((dir_files, favourites));
 }
 
