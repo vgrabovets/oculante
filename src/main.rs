@@ -1171,28 +1171,26 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 
 fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
+        let conn = Connection::open(
+            state.folder_selected
+                .as_ref()
+                .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+                .join(Path::new(FAVOURITES_DB))
+        )
+            .expect("cannot open DB connection");
+
+        conn.execute(
+            "create table if not exists favourites (path text primary key)",
+            (),
+        ).expect("cannot create table");
+
+        let record = img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
+            .unwrap()
+            .components()
+            .map(|component| component.as_os_str().to_str().unwrap())
+            .join("\t");
+
         if !state.scrubber.favourites.contains(img_path) {
-            let record = img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
-                .unwrap()
-                .components()
-                .map(|component| component.as_os_str().to_str().unwrap())
-                .join("\t");
-
-            let conn = Connection::open(
-                state.folder_selected
-                    .as_ref()
-                    .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                    .join(Path::new(FAVOURITES_DB))
-            )
-                .expect("cannot open DB connection");
-
-            conn.execute(
-                "create table if not exists favourites (
-                path text primary key
-                )",
-                (),
-            ).expect("cannot create table");
-
             conn.execute(
                 "INSERT INTO favourites (path) values (?1)",
                 [record],
@@ -1201,7 +1199,13 @@ fn add_to_favourites(state: &mut OculanteState) {
             state.scrubber.favourites.insert(img_path.clone());
             state.current_image_is_favourite = true;
         } else {
-            state.send_message_err(format!("{:?} is already favourite", img_path).as_str());
+            conn.execute(
+                "DELETE FROM favourites where path = (?1)",
+                [record],
+            ).expect("cannot delete record");
+
+            state.scrubber.favourites.remove(img_path);
+            state.current_image_is_favourite = false;
         }
     }
 }

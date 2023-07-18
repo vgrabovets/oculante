@@ -206,17 +206,17 @@ fn join_path_parts(path_with_tabs: String) -> PathBuf {
 }
 
 fn insert_after_every(main_vector: Vec<PathBuf>, other_vector: Vec<PathBuf>, after: usize) -> Vec<PathBuf> {
-    let mut result = Vec::with_capacity(main_vector.len() + other_vector.len());
+    let mut result = Vec::with_capacity(main_vector.len());
     let mut other_vector_i = 0;
     let other_vector_set: HashSet<PathBuf> = other_vector.clone().into_iter().collect();
 
-    for (i, element) in main_vector.into_iter().enumerate() {
+    for element in main_vector.into_iter() {
         if other_vector_set.contains(&element) {
             continue
         }
 
         result.push(element);
-        if other_vector_i < other_vector.len() && (i + 1) % after == 0 {
+        if other_vector_i < other_vector.len() && result.len() % after == 0 {
             result.push(other_vector[other_vector_i].clone());
             other_vector_i += 1;
         }
