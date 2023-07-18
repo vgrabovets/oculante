@@ -7,6 +7,7 @@ use crate::{
 use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
+use rusqlite::Connection;
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
@@ -89,6 +90,7 @@ pub struct OculanteState {
     pub toggle_slideshow: bool,
     pub slideshow_time: Instant,
     pub current_image_is_favourite: bool,
+    pub db_connection: Option<Connection>,
     pub first_start: bool
 }
 
@@ -148,6 +150,7 @@ impl Default for OculanteState {
             toggle_slideshow: false,
             slideshow_time: Instant::now(),
             current_image_is_favourite: Default::default(),
+            db_connection: None,
             first_start: true,
         }
     }

@@ -12,7 +12,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use shortcuts::key_pressed;
 use std::path::Path;
 use std::path::PathBuf;
@@ -48,6 +48,7 @@ use crate::image_editing::EditState;
 
 mod image_editing;
 pub mod paint;
+mod db;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
 const FAVOURITES_DB: &str = "favourites.db";
@@ -1171,18 +1172,25 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 
 fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
-        let conn = Connection::open(
-            state.folder_selected
-                .as_ref()
-                .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                .join(Path::new(FAVOURITES_DB))
-        )
-            .expect("cannot open DB connection");
+        let db_file = state.folder_selected
+            .as_ref()
+            .unwrap_or(&img_path.parent().unwrap().to_path_buf())
+            .join(Path::new(FAVOURITES_DB));
 
-        conn.execute(
-            "create table if not exists favourites (path text primary key)",
-            (),
-        ).expect("cannot create table");
+        let db_file_exists = db_file.exists();
+
+        if state.db_connection.is_none() {
+            state.db_connection = Connection::open(db_file)
+                .optional()
+                .expect("cannot open DB connection");
+        }
+
+        if !db_file_exists {
+            state.db_connection.as_ref().unwrap().execute(
+                "create table if not exists favourites (path text primary key)",
+                (),
+            ).expect("cannot create table");
+        }
 
         let record = img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
             .unwrap()
@@ -1191,7 +1199,7 @@ fn add_to_favourites(state: &mut OculanteState) {
             .join("\t");
 
         if !state.scrubber.favourites.contains(img_path) {
-            conn.execute(
+            state.db_connection.as_ref().unwrap().execute(
                 "INSERT INTO favourites (path) values (?1)",
                 [record],
             ).expect("cannot save record");
@@ -1199,7 +1207,7 @@ fn add_to_favourites(state: &mut OculanteState) {
             state.scrubber.favourites.insert(img_path.clone());
             state.current_image_is_favourite = true;
         } else {
-            conn.execute(
+            state.db_connection.as_ref().unwrap().execute(
                 "DELETE FROM favourites where path = (?1)",
                 [record],
             ).expect("cannot delete record");
