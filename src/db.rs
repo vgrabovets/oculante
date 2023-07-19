@@ -8,7 +8,7 @@ const FAVOURITES_DB: &str = "favourites.db";
 
 #[derive(Debug)]
 pub struct DB {
-    pub connection: Connection,
+    connection: Option<Connection>,
     folder: PathBuf,
 }
 
@@ -23,13 +23,13 @@ impl DB {
         ).expect("cannot create table");
         let folder_out = folder.clone();
 
-        Self {connection, folder: folder_out}
+        Self {connection: Some(connection), folder: folder_out}
     }
 
     pub fn insert(&self, img_path: &PathBuf) {
         let record = self.prepare_record(img_path);
         debug!("insert {} to DB", record);
-        self.connection.execute(
+        self.connection.as_ref().unwrap().execute(
             "INSERT INTO favourites (path) values (?1)",
             [record],
         ).expect("cannot save record");
@@ -38,7 +38,7 @@ impl DB {
     pub fn delete(&self, img_path: &PathBuf) {
         let record = self.prepare_record(img_path);
         debug!("delete {} from DB", record);
-        self.connection.execute(
+        self.connection.as_ref().unwrap().execute(
             "DELETE FROM favourites where path = (?1)",
             [record],
         ).expect("cannot delete record");
@@ -46,7 +46,11 @@ impl DB {
 
     pub fn get_all(&self) -> HashSet<PathBuf> {
         debug!("run select * statement");
-        let mut stmt = self.connection.prepare("SELECT path from favourites").expect("cannot prepare query");
+        let mut stmt = self.connection
+            .as_ref()
+            .unwrap()
+            .prepare("SELECT path from favourites")
+            .expect("cannot prepare query");
 
         stmt
             .query_map((), |row| { Ok(row.get(0)?) })
@@ -56,9 +60,9 @@ impl DB {
             .collect()
     }
 
-    pub fn close(&self) {
+    pub fn close(&mut self) {
         debug!("close DB connection");
-        self.connection.close().expect("cannot close DB connection");
+        self.connection.take().unwrap().close().expect("cannot close DB connection")
     }
 
     fn prepare_record(&self, img_path: &PathBuf) -> String {

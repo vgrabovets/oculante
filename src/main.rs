@@ -364,7 +364,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
 
-                if let Some(db) = &state.db {
+                if let Some(ref mut db) = state.db {
                     db.close();
                 }
 
@@ -511,7 +511,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 (app.window().position(), app.window().size());
             state.persistent_settings.save_blocking();
 
-            if let Some(db) = &state.db {
+            if let Some(ref mut db) = state.db {
                 db.close();
             }
         }
@@ -741,7 +741,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
                     } else if let Some(parent) = p.parent() {
-                        info!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
                             info!("is file {}", parent.join(".oculante").display());
 
@@ -995,7 +994,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // debug!("cooldown {}", state.toast_cooldown);
 
             if state.toast_cooldown > max_anim_len {
-                debug!("Setting message to none, timer reached.");
                 state.message = None;
             }
         }
