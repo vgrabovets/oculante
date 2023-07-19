@@ -1,4 +1,5 @@
 use crate::{
+    db::DB,
     image_editing::EditState,
     scrubber::Scrubber,
     settings::PersistentSettings,
@@ -89,6 +90,7 @@ pub struct OculanteState {
     pub toggle_slideshow: bool,
     pub slideshow_time: Instant,
     pub current_image_is_favourite: bool,
+    pub db: Option<DB>,
     pub first_start: bool
 }
 
@@ -148,6 +150,7 @@ impl Default for OculanteState {
             toggle_slideshow: false,
             slideshow_time: Instant::now(),
             current_image_is_favourite: Default::default(),
+            db: None,
             first_start: true,
         }
     }

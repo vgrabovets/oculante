@@ -5,7 +5,6 @@ use std::{
 };
 
 use image::RgbaImage;
-use log::debug;
 
 #[derive(Debug)]
 pub struct Cache {
@@ -46,12 +45,6 @@ impl Cache {
                     key = p.clone();
                 }
             }
-            debug!(
-                "Cache limit hit, deleting oldest: {}, {}s old",
-                key.display(),
-                latest.elapsed().as_secs_f32()
-            );
-
             _ = self.data.remove(&key);
         }
     }

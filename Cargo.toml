@@ -74,6 +74,12 @@ update = ["self_update"]
 [target.'cfg(target_os = "macos")'.dependencies]
 fruitbasket = "0.10.0"
 
+[target.'cfg(unix)'.dependencies]
+rusqlite = "0.29.0"
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = {version = "0.29.0", features = ["winsqlite3"]}
+
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
 windres = "0.2"

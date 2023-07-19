@@ -1,8 +1,8 @@
 #![windows_subsystem = "windows"]
 
+use std::collections::HashSet;
 use clap::Arg;
 use clap::Command;
-use itertools::Itertools;
 use log::debug;
 use log::error;
 use log::info;
@@ -13,9 +13,6 @@ use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
 use shortcuts::key_pressed;
-use std::fs;
-use std::io::Write;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -45,13 +42,14 @@ mod ui;
 mod update;
 use ui::*;
 
+use crate::db::{DB, get_db_file};
 use crate::image_editing::EditState;
 
+mod db;
 mod image_editing;
 pub mod paint;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
-const FAVOURITES_FILE: &str = "favourites.txt";
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -61,7 +59,7 @@ fn main() -> Result<(), String> {
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "debug");
+        std::env::set_var("RUST_LOG", "oculante=debug");
         let _ = env_logger::try_init();
     }
 
@@ -193,8 +191,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         gfx.limits().max_texture_size,
     );
 
-    debug!("Image is: {:?}", maybe_img_location);
-
     if let Some(ref location) = maybe_img_location {
         // Check if path is a directory or a file (and that it even exists)
         let mut start_img_location: Option<PathBuf> = None;
@@ -316,8 +312,6 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::KeyDown { .. } => {
-            debug!("key down");
-
             // return;
             // pan image with keyboard
             let delta = 40.;
@@ -369,6 +363,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
+
+                if let Some(ref mut db) = state.db {
+                    db.close();
+                }
+
                 app.backend.exit();
             }
             #[cfg(feature = "turbo")]
@@ -506,11 +505,15 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
     match evt {
         Event::Exit => {
-            info!("About to exit");
+            debug!("About to exit");
             // save position
             state.persistent_settings.window_geometry =
                 (app.window().position(), app.window().size());
             state.persistent_settings.save_blocking();
+
+            if let Some(ref mut db) = state.db {
+                db.close();
+            }
         }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
@@ -689,7 +692,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // fill image sequence
         if state.folder_selected.is_none() {
             if let Some(p) = &state.current_path {
-                state.scrubber = scrubber::Scrubber::new(p, None, false, false, 0);
+                state.scrubber = scrubber::Scrubber::new(p, false, false, None, 0);
                 state.scrubber.wrap = state.persistent_settings.wrap_folder;
 
                 // debug!("{:#?} from {}", &state.scrubber, p.display());
@@ -738,7 +741,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
                     } else if let Some(parent) = p.parent() {
-                        info!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
                             info!("is file {}", parent.join(".oculante").display());
 
@@ -992,7 +994,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             // debug!("cooldown {}", state.toast_cooldown);
 
             if state.toast_cooldown > max_anim_len {
-                debug!("Setting message to none, timer reached.");
                 state.message = None;
             }
         }
@@ -1107,11 +1108,21 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         _ = state.persistent_settings.save();
         state.folder_selected = Option::from(folder_path.clone());
 
+        let db_file = get_db_file(&folder_path);
+
+        let favourites: Option<HashSet<PathBuf>>;
+        if db_file.exists() {
+            state.db = Option::from(DB::new(&folder_path));
+            favourites = Option::from(state.db.as_ref().unwrap().get_all());
+        } else {
+            favourites = None;
+        }
+
         state.scrubber = Scrubber::new(
-            folder_path.as_path(),
-            Some(FAVOURITES_FILE),
+            &folder_path.as_path(),
             true,
             true,
+            favourites,
             state.persistent_settings.add_fav_every_n,
         );
         let number_of_files = state.scrubber.len();
@@ -1119,7 +1130,7 @@ fn browse_for_folder_path(state: &mut OculanteState) {
         if number_of_files > 0 {
             state.send_message(
                 format!(
-                    "number of files: {}, number of favourites: {}",
+                    "files: {}, favourites: {}",
                     number_of_files,
                     number_of_favs,
                 ).as_str(),
@@ -1174,32 +1185,19 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 
 fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
+        if state.db.is_none() {
+            state.db = Option::from(DB::new(state.folder_selected.as_ref().unwrap()));
+        }
+
         if !state.scrubber.favourites.contains(img_path) {
-            let mut file = fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(
-                    state.folder_selected
-                        .as_ref()
-                        .unwrap_or(&img_path.parent().unwrap().to_path_buf())
-                        .join(Path::new(FAVOURITES_FILE))
-                )
-                .expect("Unable to open file");
-
-            writeln!(
-                file,
-                "{}",
-                img_path.strip_prefix(state.folder_selected.as_ref().unwrap().as_path())
-                    .unwrap()
-                    .components()
-                    .map(|component| component.as_os_str().to_str().unwrap())
-                    .join("\t")
-            ).expect("Unable to write data");
-
+            state.db.as_ref().unwrap().insert(&img_path);
             state.scrubber.favourites.insert(img_path.clone());
             state.current_image_is_favourite = true;
+
         } else {
-            state.send_message_err(format!("{:?} is already favourite", img_path).as_str());
+            state.db.as_ref().unwrap().delete(&img_path);
+            state.scrubber.favourites.remove(img_path);
+            state.current_image_is_favourite = false;
         }
     }
 }
