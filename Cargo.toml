@@ -23,6 +23,7 @@ anyhow = "1.0"
 arboard = "3.2"
 avif-decode = {version = "0.2", optional = true}
 clap = "3.2"
+clipboard = "0.5.0"
 dds-rs = "0.7"
 dirs = "5.0"
 env_logger = "0.10"

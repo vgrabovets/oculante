@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use clap::Arg;
 use clap::Command;
+use clipboard::{ClipboardContext, ClipboardProvider};
 use log::debug;
 use log::error;
 use log::info;
@@ -420,6 +421,12 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, BrowseFolder) {
                 browse_for_folder_path(state)
+            }
+            if key_pressed(app, state, CopyImagePathToClipboard) {
+                if let Some(img_path) = &state.current_path {
+                    let mut ctx: ClipboardContext = ClipboardProvider::new().expect("Cannot create Clipboard context");
+                    ctx.set_contents(img_path.to_string_lossy().to_string()).expect("Cannot set Clipboard context");
+                }
             }
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
