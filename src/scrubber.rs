@@ -90,14 +90,10 @@ impl Scrubber {
     }
 
     pub fn re_initialize(&mut self, intersperse_with_favs_every_n: usize) {
-        let entries_wo_favourites: Vec<PathBuf> = self.entries
-            .iter()
-            .filter(|element| !self.favourites.contains(*element))
-            .map(|element| element.clone())
-            .collect();
-
-        let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
-        self.entries = insert_after_every(entries_wo_favourites, favourites_vec, intersperse_with_favs_every_n);
+        if intersperse_with_favs_every_n > 0 {
+            let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
+            self.entries = insert_after_every(self.entries.clone(), favourites_vec, intersperse_with_favs_every_n);
+        }
     }
 }
 
