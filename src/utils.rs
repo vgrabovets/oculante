@@ -154,7 +154,6 @@ impl Player {
 
         if let Some(cached_image) = self.cache.get(img_location) {
             _ = self.image_sender.send(Frame::new_still(cached_image));
-            info!("Cache hit for {}", img_location.display());
             return;
         }
 
