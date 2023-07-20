@@ -647,6 +647,13 @@ pub fn next_image(state: &mut OculanteState) {
     }
 }
 
+pub fn reload_image(state: &mut OculanteState) {
+    let img_path = state.scrubber.set(state.scrubber.index);
+    state.is_loaded = false;
+    state.current_path = Some(img_path.clone());
+    state.player.load(img_path.as_path(), state.message_channel.0.clone());
+}
+
 /// Set the window title
 pub fn set_title(app: &mut App, state: &mut OculanteState) {
     let p = state.current_path.clone().unwrap_or_default();

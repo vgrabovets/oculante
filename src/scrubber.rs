@@ -1,6 +1,5 @@
 use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
-use log::debug;
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
 use std::default::Default;
@@ -77,7 +76,6 @@ impl Scrubber {
         if index < self.entries.len() {
             self.index = index;
         }
-        debug!("{:?}", self.entries.get(self.index));
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
@@ -90,10 +88,8 @@ impl Scrubber {
     }
 
     pub fn re_initialize(&mut self, intersperse_with_favs_every_n: usize) {
-        if intersperse_with_favs_every_n > 0 {
-            let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
-            self.entries = insert_after_every(self.entries.clone(), favourites_vec, intersperse_with_favs_every_n);
-        }
+        let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
+        self.entries = insert_after_every(self.entries.clone(), favourites_vec, intersperse_with_favs_every_n);
     }
 }
 
@@ -154,9 +150,7 @@ pub fn get_image_filenames_for_directory(
         });
     }
 
-    if intersperse_with_favs_every_n > 0 {
-        dir_files = insert_after_every(dir_files, favourites_vec, intersperse_with_favs_every_n);
-    }
+    dir_files = insert_after_every(dir_files, favourites_vec, intersperse_with_favs_every_n);
     return Ok(dir_files);
 }
 
@@ -182,9 +176,21 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
 
 fn insert_after_every(main_vector: Vec<PathBuf>, other_vector: Vec<PathBuf>, after: usize) -> Vec<PathBuf> {
     let mut result = Vec::with_capacity(main_vector.len());
+    let other_vector_set: HashSet<PathBuf> = other_vector.clone().into_iter().collect();
+
+    if after == 0 {
+        result.extend_from_slice(&other_vector);
+        result.extend(
+            main_vector.
+                into_iter().
+                filter(|element| !other_vector_set.contains(element))
+        );
+        return result;
+    }
+
     let mut i = 0;
     let mut other_vector_i = 0;
-    let other_vector_set: HashSet<PathBuf> = other_vector.clone().into_iter().collect();
+
 
     for element in main_vector.into_iter() {
         if other_vector_set.contains(&element) {

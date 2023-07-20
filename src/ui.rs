@@ -8,8 +8,8 @@ use crate::{
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
-        load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
-        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+        load_image_from_path, next_image, prev_image, reload_image, send_extended_info, set_title,
+        solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
 };
 
@@ -492,7 +492,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         .on_hover_text("Add favourite to slideshow every n slide")
                         .changed()
                     {
-                        state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
+                        if state.current_path.is_some() {
+                            state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
+                            reload_image(state);
+                        }
                     }
                 });
 
