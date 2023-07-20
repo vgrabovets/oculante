@@ -568,7 +568,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::MouseDown { button, .. } => {
-            state.drag_enabled = true;
+            // state.drag_enabled = true;
             match button {
                 MouseButton::Left => {
                     if !state.mouse_grab {
@@ -577,6 +577,15 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 }
                 MouseButton::Middle => {
                     state.drag_enabled = true;
+                }
+                MouseButton::Right => {
+                    if state.current_image.is_some() {
+                        if state.image_geometry.scale < 1. {
+                            set_zoom(1., None, state);
+                        } else {
+                            state.reset_image = true;
+                        }
+                    }
                 }
                 _ => {}
             }
