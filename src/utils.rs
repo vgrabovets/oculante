@@ -533,7 +533,7 @@ impl ImageExt for RgbaImage {
             .with_mipmaps(true)
             .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            .with_filter(TextureFilter::Linear, TextureFilter::Linear)
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             .build()
             .ok()
