@@ -727,3 +727,23 @@ pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
     }
     set_title(app, state);
 }
+
+pub fn cursor_within_image(
+    cursor_position: Vector2<f32>,
+    img_offset: Vector2<f32>,
+    img_dims: (u32, u32),
+    img_scale: f32,
+) -> bool {
+    let img_dims_scaled = (img_dims.0 as f32 * img_scale, img_dims.1 as f32 * img_scale);
+    let img_x = (img_offset[0], img_offset[0] + img_dims_scaled.0);
+    let img_y = (img_offset[1], img_offset[1] + img_dims_scaled.1);
+
+    if img_x.0 <= cursor_position[0]
+        && cursor_position[0] <= img_x.1
+        && img_y.0 <= cursor_position[1]
+        && cursor_position[1] <= img_y.1
+    {
+        return true;
+    }
+    false
+}

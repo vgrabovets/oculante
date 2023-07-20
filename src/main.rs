@@ -579,8 +579,16 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     state.drag_enabled = true;
                 }
                 MouseButton::Right => {
-                    if state.current_image.is_some() {
-                        if state.image_geometry.scale < 1. {
+                    if state.current_image.is_some()
+                        && !state.pointer_over_ui
+                        && cursor_within_image(
+                            state.cursor,
+                            state.image_geometry.offset,
+                            state.image_dimension,
+                            state.image_geometry.scale,
+                        )
+                    {
+                        if state.image_geometry.offset[1] == 0. {
                             set_zoom(1., None, state);
                         } else {
                             state.reset_image = true;
