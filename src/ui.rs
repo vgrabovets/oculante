@@ -1792,7 +1792,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for image")
             .clicked()
         {
-            browse_for_image_path(state)
+            browse_for_image_path(state, app)
         }
 
         #[cfg(feature = "file_open")]
@@ -1800,7 +1800,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             .on_hover_text("Browse for folder")
             .clicked()
         {
-            browse_for_folder_path(state)
+            browse_for_folder_path(state, app)
         }
 
         ui.scope(|ui| {

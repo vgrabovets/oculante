@@ -416,11 +416,11 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
-                browse_for_image_path(state)
+                browse_for_image_path(state, app)
             }
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, BrowseFolder) {
-                browse_for_folder_path(state)
+                browse_for_folder_path(state, app)
             }
             if key_pressed(app, state, CopyImagePathToClipboard) {
                 if let Some(img_path) = &state.current_path {
@@ -1094,7 +1094,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
-fn browse_for_image_path(state: &mut OculanteState) {
+fn browse_for_image_path(state: &mut OculanteState, app: &mut App) {
+    app.keyboard.down = Default::default();
     let start_directory = &state.persistent_settings.last_open_directory;
 
     let file_dialog_result = rfd::FileDialog::new()
@@ -1120,7 +1121,8 @@ fn browse_for_image_path(state: &mut OculanteState) {
 }
 
 #[cfg(feature = "file_open")]
-fn browse_for_folder_path(state: &mut OculanteState) {
+fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
+    app.keyboard.down = Default::default();
     let start_directory = &state.persistent_settings.last_open_directory;
 
     let folder_dialog_result = rfd::FileDialog::new()
