@@ -620,7 +620,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
-
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
@@ -669,7 +668,6 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Only receive messages if current one is cleared
     // debug!("cooldown {}", state.toast_cooldown);
 
-
     // check if a new message has been sent
     if let Ok(msg) = state.message_channel.1.try_recv() {
         debug!("Received message: {:?}", msg);
@@ -699,6 +697,17 @@ fn update(app: &mut App, state: &mut OculanteState) {
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
     let mut draw = gfx.create_draw();
+
+    if let Ok(p) = state.load_channel.1.try_recv() {
+        state.is_loaded = false;
+        state.current_image = None;
+        state.player.load(&p, state.message_channel.0.clone());
+        if let Some(dir) = p.parent() {
+            state.persistent_settings.last_open_directory = dir.to_path_buf();
+        }
+        state.current_path = Some(p);
+        _ = state.persistent_settings.save();
+    }
 
     // check if a new texture has been sent
     if let Ok(frame) = state.texture_channel.1.try_recv() {
@@ -787,7 +796,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                         }
                     }
                 }
-                state.animation_mode = false;
+                state.redraw = false;
                 state.image_info = None;
             }
             FrameSource::EditResult => {
@@ -795,11 +804,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // state.edit_state.is_processing = false;
             }
             FrameSource::AnimationStart => {
-                state.animation_mode = true;
+                state.redraw = true;
                 state.reset_image = true
             }
             FrameSource::Animation => {
-                state.animation_mode = true;
+                state.redraw = true;
             }
         }
 
@@ -838,7 +847,8 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
     }
 
-    if state.animation_mode {
+    if state.redraw {
+        debug!("Force redraw");
         app.window().request_frame();
     }
 
@@ -1012,11 +1022,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.ctx().request_repaint();
                 },
             );
-            let max_anim_len = if state.persistent_settings.vsync {
-                2.5
-            } else {
-                50.
-            };
+            let max_anim_len = 2.5;
 
             // using delta does not work with rfd
             // state.toast_cooldown += app.timer.delta_f32();

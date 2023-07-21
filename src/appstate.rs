@@ -60,6 +60,8 @@ pub struct OculanteState {
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
     pub message_channel: (Sender<Message>, Receiver<Message>),
+    /// Channel to load images from
+    pub load_channel: (Sender<PathBuf>, Receiver<PathBuf>),
     pub extended_info_channel: (Sender<ExtendedImageInfo>, Receiver<ExtendedImageInfo>),
     pub extended_info_loading: bool,
     /// The Player, responsible for loading and sending Frames
@@ -85,13 +87,13 @@ pub struct OculanteState {
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
     pub checker_texture: Option<Texture>,
-    pub animation_mode: bool,
+    pub redraw: bool,
     pub folder_selected: Option<PathBuf>,
     pub toggle_slideshow: bool,
     pub slideshow_time: Instant,
     pub current_image_is_favourite: bool,
     pub db: Option<DB>,
-    pub first_start: bool
+    pub first_start: bool,
 }
 
 impl OculanteState {
@@ -124,6 +126,7 @@ impl Default for OculanteState {
             player: Player::new(tx_channel.0.clone(), 20, 16384),
             texture_channel: tx_channel,
             message_channel: mpsc::channel(),
+            load_channel: mpsc::channel(),
             extended_info_channel: mpsc::channel(),
             extended_info_loading: Default::default(),
             mouse_delta: Default::default(),
@@ -145,7 +148,7 @@ impl Default for OculanteState {
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
             checker_texture: Default::default(),
-            animation_mode: Default::default(),
+            redraw: Default::default(),
             folder_selected: Default::default(),
             toggle_slideshow: false,
             slideshow_time: Instant::now(),
