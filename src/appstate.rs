@@ -120,6 +120,30 @@ impl OculanteState {
         }
     }
 
+    pub fn cursor_within_image(& self) -> bool {
+        let img_dims_scaled = (
+            self.image_dimension.0 as f32 * self.image_geometry.scale,
+            self.image_dimension.1 as f32 * self.image_geometry.scale,
+        );
+        let img_x = (
+            self.image_geometry.offset[0],
+            self.image_geometry.offset[0] + img_dims_scaled.0,
+        );
+        let img_y = (
+            self.image_geometry.offset[1],
+            self.image_geometry.offset[1] + img_dims_scaled.1,
+        );
+
+        if img_x.0 <= self.cursor[0]
+            && self.cursor[0] <= img_x.1
+            && img_y.0 <= self.cursor[1]
+            && self.cursor[1] <= img_y.1
+        {
+            return true;
+        }
+        false
+    }
+
     fn reset(&mut self) {
         *self = OculanteState::default();
     }

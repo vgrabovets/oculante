@@ -13,6 +13,7 @@ use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use round::round;
 use shortcuts::key_pressed;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -586,12 +587,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::MouseDown { button, .. } => {
-            if cursor_within_image(
-                state.cursor,
-                state.image_geometry.offset,
-                state.image_dimension,
-                state.image_geometry.scale,
-            ) {
+            if state.cursor_within_image() {
                 match button {
                     MouseButton::Left => {
                         if !state.mouse_grab {
@@ -603,7 +599,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                     }
                     MouseButton::Right => {
                         if state.current_image.is_some() {
-                            if state.image_geometry.offset[1] == 0. {
+                            if round(state.image_geometry.offset[1] as f64, 4) == 0. {
                                 set_zoom(1., None, state);
                             } else {
                                 state.reset_image = true;
