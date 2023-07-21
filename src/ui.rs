@@ -8,8 +8,8 @@ use crate::{
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
         clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
-        load_image_from_path, next_image, prev_image, reload_image, send_extended_info, set_title,
-        solo_channel, toggle_fullscreen, unpremult, ColorChannel, ImageExt,
+        load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
+        toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
 };
 
@@ -494,7 +494,7 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         && state.current_path.is_some()
                     {
                         state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
-                        reload_image(state);
+                        state.reload_image();
                     }
                 });
 
@@ -1559,9 +1559,10 @@ pub fn scrubber_ui(state: &mut OculanteState, ui: &mut Ui) {
         .slider_timeline(&mut state.scrubber.index, 0..=len)
         .changed()
     {
-        let p = state.scrubber.set(state.scrubber.index);
-        state.current_path = Some(p.clone());
-        state.player.load(&p, state.message_channel.0.clone());
+        if let Ok(p) = state.scrubber.set(state.scrubber.index) {
+            state.current_path = Some(p.clone());
+            state.player.load(&p, state.message_channel.0.clone());
+        }
     }
 }
 

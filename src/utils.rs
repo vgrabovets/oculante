@@ -607,28 +607,30 @@ pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
 pub fn last_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
         let last = state.scrubber.len().saturating_sub(1);
-        let next_img = state.scrubber.set(last);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
+        if let Ok(next_img) = state.scrubber.set(last) {
+            // prevent reload if at last or first
+            if &next_img != img_location {
+                state.is_loaded = false;
+                *img_location = next_img;
+                state
+                    .player
+                    .load(img_location, state.message_channel.0.clone());
+            }
         }
     }
 }
 
 pub fn first_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.set(0);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
+        if let Ok(next_img) = state.scrubber.set(0) {
+            // prevent reload if at last or first
+            if &next_img != img_location {
+                state.is_loaded = false;
+                *img_location = next_img;
+                state
+                    .player
+                    .load(img_location, state.message_channel.0.clone());
+            }
         }
     }
 }
@@ -645,13 +647,6 @@ pub fn next_image(state: &mut OculanteState) {
                 .load(img_location, state.message_channel.0.clone());
         }
     }
-}
-
-pub fn reload_image(state: &mut OculanteState) {
-    let img_path = state.scrubber.set(state.scrubber.index);
-    state.is_loaded = false;
-    state.current_path = Some(img_path.clone());
-    state.player.load(img_path.as_path(), state.message_channel.0.clone());
 }
 
 /// Set the window title

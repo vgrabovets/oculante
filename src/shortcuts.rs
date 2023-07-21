@@ -46,6 +46,7 @@ pub enum InputEvent {
     ZenMode,
     Favourite,
     CopyImagePathToClipboard,
+    DeleteFile,
     ToggleSlideshow,
 }
 
@@ -135,6 +136,7 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::ZenMode, "Z")
             .add_key(InputEvent::Favourite, "J")
             .add_key(InputEvent::ToggleSlideshow, "Space")
+            .add_key(InputEvent::DeleteFile, "Delete")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
             .add_keys(InputEvent::BrowseFolder, &["LControl", "LShift", "O"])

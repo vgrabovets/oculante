@@ -17,6 +17,7 @@ use shortcuts::key_pressed;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use trash;
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -369,6 +370,14 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             if key_pressed(app, state, ToggleSlideshow) {
                 state.toggle_slideshow = !state.toggle_slideshow;
+            }
+            if key_pressed(app, state, DeleteFile) {
+                if let Some(img_path) = &state.current_path {
+                    trash::delete(img_path).expect("Cannot delete file");
+                    state.send_message(format!("file {:?} removed", img_path).as_str());
+                    state.scrubber.delete(img_path);
+                    state.reload_image();
+                }
             }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();

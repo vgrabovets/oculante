@@ -72,11 +72,17 @@ impl Scrubber {
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 
-    pub fn set(&mut self, index: usize) -> PathBuf {
+    pub fn set(&mut self, index: usize) -> Result<PathBuf, String> {
+        if self.entries.is_empty() {
+            return Err("Scrubber has no entries".to_string());
+        }
+
         if index < self.entries.len() {
             self.index = index;
+        } else {
+            self.index = self.entries.len() - 1;
         }
-        self.entries.get(self.index).cloned().unwrap_or_default()
+        Ok(self.entries[self.index].clone())
     }
 
     pub fn get(&mut self, index: usize) -> Option<PathBuf> {
@@ -90,6 +96,10 @@ impl Scrubber {
     pub fn re_initialize(&mut self, intersperse_with_favs_every_n: usize) {
         let favourites_vec: Vec<PathBuf> = self.favourites.clone().into_iter().collect();
         self.entries = insert_after_every(self.entries.clone(), favourites_vec, intersperse_with_favs_every_n);
+    }
+
+    pub fn delete(&mut self, file: &PathBuf) {
+        self.entries.retain(|element| element != file);
     }
 }
 
@@ -190,7 +200,6 @@ fn insert_after_every(main_vector: Vec<PathBuf>, other_vector: Vec<PathBuf>, aft
 
     let mut i = 0;
     let mut other_vector_i = 0;
-
 
     for element in main_vector.into_iter() {
         if other_vector_set.contains(&element) {

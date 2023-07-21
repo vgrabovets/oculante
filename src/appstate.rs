@@ -9,6 +9,7 @@ use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
+    default::Default,
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
     time::Instant,
@@ -103,6 +104,24 @@ impl OculanteState {
 
     pub fn send_message_err(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::err(msg));
+    }
+
+    pub fn reload_image(&mut self) {
+        match self.scrubber.set(self.scrubber.index) {
+            Ok(img_path) => {
+                self.is_loaded = false;
+                self.current_path = Some(img_path.clone());
+                self.player.load(img_path.as_path(), self.message_channel.0.clone());
+            },
+            Err(_) => {
+                self.reset();
+                self.send_message_err("No images");
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        *self = OculanteState::default();
     }
 }
 
