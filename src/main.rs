@@ -315,6 +315,14 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
         Event::KeyDown { .. } => {
             // return;
             // pan image with keyboard
+            if state.key_grab {
+                state.send_message_err("Shortcuts don't work, key grab is active");
+            }
+
+            if state.message.is_some() {
+                state.message = None;
+            }
+
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
                 state.image_geometry.offset.x += delta;
@@ -426,6 +434,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 if let Some(img_path) = &state.current_path {
                     let mut ctx: ClipboardContext = ClipboardProvider::new().expect("Cannot create Clipboard context");
                     ctx.set_contents(img_path.to_string_lossy().to_string()).expect("Cannot set Clipboard context");
+                    state.send_message(format!("path {:?} copied", img_path).as_str());
                 }
             }
             if key_pressed(app, state, NextImage) {
@@ -660,24 +669,23 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Only receive messages if current one is cleared
     // debug!("cooldown {}", state.toast_cooldown);
 
-    if state.message.is_none() {
+
+    // check if a new message has been sent
+    if let Ok(msg) = state.message_channel.1.try_recv() {
+        debug!("Received message: {:?}", msg);
         state.toast_cooldown = 0.;
-
-        // check if a new message has been sent
-        if let Ok(msg) = state.message_channel.1.try_recv() {
-            debug!("Received message: {:?}", msg);
-            match msg {
-                Message::LoadError(_) => {
-                    state.current_image = None;
-                    state.is_loaded = true;
-                    state.current_texture = None;
-                },
-                _ => (),
-            }
-
-            state.message = Some(msg);
+        match msg {
+            Message::LoadError(_) => {
+                state.current_image = None;
+                state.is_loaded = true;
+                state.current_texture = None;
+            },
+            _ => (),
         }
+
+        state.message = Some(msg);
     }
+
     state.first_start = false;
 
     if state.toggle_slideshow
