@@ -491,11 +491,10 @@ pub fn settings_ui(app: &mut App, ctx: &Context, state: &mut OculanteState) {
                         .add(egui::DragValue::new(&mut state.persistent_settings.add_fav_every_n).clamp_range(0..=25))
                         .on_hover_text("Add favourite to slideshow every n slide")
                         .changed()
+                        && state.current_path.is_some()
                     {
-                        if state.current_path.is_some() {
-                            state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
-                            reload_image(state);
-                        }
+                        state.scrubber.re_initialize(state.persistent_settings.add_fav_every_n);
+                        reload_image(state);
                     }
                 });
 
