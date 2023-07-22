@@ -18,7 +18,6 @@ use shortcuts::key_pressed;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use trash;
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
@@ -53,6 +52,16 @@ mod image_editing;
 pub mod paint;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
+const STAR: ui::Star = ui::Star {
+    spikes: 5,
+    outer_radius: 20.,
+    inner_radius: 10.,
+    x: 50.,
+    y: 60.,
+    stroke: 3.,
+};
+const TOP_MENU_HEIGHT: f32 = 30.;
+
 
 #[notan_main]
 fn main() -> Result<(), String> {
@@ -595,7 +604,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         }
                     }
                     MouseButton::Middle => {
-                        state.drag_enabled = true;
+                        state.show_metadata_tooltip = !state.show_metadata_tooltip;
                     }
                     MouseButton::Right => {
                         if state.current_image.is_some() {
@@ -969,22 +978,40 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         }
 
         if state.current_image_is_favourite {
-            draw.star(5, 20.0, 10.0)
-                .position(50.0, 60.0)
+            draw.star(STAR.spikes, STAR.outer_radius, STAR.inner_radius)
+                .position(STAR.x, STAR.y)
                 .fill_color(Color::YELLOW)
                 .fill()
                 .stroke_color(Color::ORANGE)
-                .stroke(3.0);
+                .stroke(STAR.stroke);
         }
     }
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
 
+        if state.show_metadata_tooltip && state.cursor_within_image() {
+            let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite {STAR.y} else {0.};
+
+            show_tooltip_at(
+                ctx,
+                egui::Id::new("my_tooltip"),
+                Some(pos2(10., pos_y)),
+                |ui| {
+                    ui.label(format!(
+                        "scale: {scale}\nwidth: {width}\nheight: {height}",
+                        scale=round(state.image_geometry.scale as f64, 2),
+                        width=state.image_dimension.0,
+                        height=state.image_dimension.1,
+                    ));
+                },
+            );
+        }
+
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")
-                .min_height(30.)
-                .default_height(30.)
+                .min_height(TOP_MENU_HEIGHT)
+                .default_height(TOP_MENU_HEIGHT)
                 .show(ctx, |ui| {
                     main_menu(ui, state, app, gfx);
                 });

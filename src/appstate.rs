@@ -94,6 +94,7 @@ pub struct OculanteState {
     pub slideshow_time: Instant,
     pub current_image_is_favourite: bool,
     pub db: Option<DB>,
+    pub show_metadata_tooltip: bool,
     pub first_start: bool,
 }
 
@@ -197,6 +198,7 @@ impl Default for OculanteState {
             slideshow_time: Instant::now(),
             current_image_is_favourite: Default::default(),
             db: None,
+            show_metadata_tooltip: false,
             first_start: true,
         }
     }

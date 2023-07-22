@@ -1908,3 +1908,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         });
     });
 }
+
+pub struct Star {
+    pub spikes: u8,
+    pub outer_radius: f32,
+    pub inner_radius: f32,
+    pub x: f32,
+    pub y: f32,
+    pub stroke: f32,
+}
