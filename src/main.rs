@@ -685,7 +685,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // check if a new message has been sent
     if let Ok(msg) = state.message_channel.1.try_recv() {
         debug!("Received message: {:?}", msg);
-        state.toast_cooldown = 0.;
+        state.toast_cooldown = Instant::now();
         match msg {
             Message::LoadError(_) => {
                 state.current_image = None;
@@ -990,7 +990,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
 
-        if state.show_metadata_tooltip && !state.settings_enabled && state.cursor_within_image() {
+        if state.show_metadata_tooltip && !state.pointer_over_ui && state.cursor_within_image() {
             let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite {STAR.y} else {0.};
 
             show_tooltip_at(
@@ -1054,14 +1054,12 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.ctx().request_repaint();
                 },
             );
-            let max_anim_len = 2.5;
 
             // using delta does not work with rfd
             // state.toast_cooldown += app.timer.delta_f32();
-            state.toast_cooldown += 0.01;
             // debug!("cooldown {}", state.toast_cooldown);
 
-            if state.toast_cooldown > max_anim_len {
+            if state.toast_cooldown.elapsed() > Duration::from_secs(3u64) {
                 state.message = None;
             }
         }

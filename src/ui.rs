@@ -1127,7 +1127,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                                     state.send_message_err(&format!("Error: Could not save: {e}"));
                                 }
                             }
-                            state.toast_cooldown = 0.0;
+                            state.toast_cooldown = Instant::now();
                             ui.ctx().request_repaint();
                         }
                     }
@@ -1771,7 +1771,9 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         //     toggle_fullscreen(app, state);
         // }
 
-        if unframed_button("⛶", ui).clicked() {
+        if unframed_button("⛶", ui)
+            .on_hover_text("Fullscreen")
+            .clicked() {
             toggle_fullscreen(app, state);
         }
 

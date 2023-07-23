@@ -82,7 +82,7 @@ pub struct OculanteState {
     pub always_on_top: bool,
     pub network_mode: bool,
     /// how long the toast message appears
-    pub toast_cooldown: f32,
+    pub toast_cooldown: Instant,
     /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
@@ -188,7 +188,7 @@ impl Default for OculanteState {
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),
-            toast_cooldown: Default::default(),
+            toast_cooldown: Instant::now(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
             checker_texture: Default::default(),
