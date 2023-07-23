@@ -990,7 +990,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
 
-        if state.show_metadata_tooltip && state.cursor_within_image() {
+        if state.show_metadata_tooltip && !state.settings_enabled && state.cursor_within_image() {
             let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite {STAR.y} else {0.};
 
             show_tooltip_at(
