@@ -110,7 +110,7 @@ impl EguiExt for Ui {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
             let available_width = ui.available_width() * 0.6;
-            let mut style = ui.style_mut();
+            let style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
 
@@ -144,7 +144,7 @@ impl EguiExt for Ui {
             let color = ui.style().visuals.selection.bg_fill;
             // let color = Color32::RED;
             let available_width = ui.available_width() * 1. - 60.;
-            let mut style = ui.style_mut();
+            let style = ui.style_mut();
             style.visuals.widgets.hovered.bg_fill = color;
             style.visuals.widgets.hovered.fg_stroke.width = 0.;
 

@@ -47,6 +47,16 @@ impl Scrubber {
             favourites: favourites_out,
         }
     }
+
+    pub fn new_from_entries(entries: Vec<PathBuf>) -> Self {
+        Self {
+            index: 0,
+            entries,
+            wrap: true,
+            favourites: Default::default(),
+        }
+    }
+
     pub fn next(&mut self) -> PathBuf {
         self.index += 1;
         if self.index > self.entries.len().saturating_sub(1) {
@@ -56,7 +66,6 @@ impl Scrubber {
                 self.index = self.entries.len().saturating_sub(1);
             }
         }
-        // debug!("{:?}", self.entries.get(self.index));
         self.entries.get(self.index).cloned().unwrap_or_default()
     }
 

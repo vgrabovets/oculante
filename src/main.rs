@@ -1,6 +1,5 @@
 #![windows_subsystem = "windows"]
 
-use std::collections::HashSet;
 use clap::Arg;
 use clap::Command;
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -15,7 +14,11 @@ use notan::egui::{self, *};
 use notan::prelude::*;
 use round::round;
 use shortcuts::key_pressed;
-use std::path::PathBuf;
+use std::collections::HashSet;
+use std::ffi::OsStr;
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 pub mod cache;
@@ -1147,17 +1150,33 @@ fn browse_for_image_path(state: &mut OculanteState, app: &mut App) {
         .pick_file();
 
     if let Some(file_path) = file_dialog_result {
-        debug!("Selected File Path = {:?}", file_path);
+        let mut current_path = file_path.clone();
         state.folder_selected = None;
+
+        if file_path.extension() == Some(OsStr::new("txt")) {
+            let file = File::open(&file_path).unwrap();
+            let reader = io::BufReader::new(file);
+            let img_paths: Vec<PathBuf> = reader
+                .lines()
+                .into_iter()
+                .filter_map(|line| {line.ok()})
+                .map(|line| {Path::new(&line).to_path_buf()})
+                .collect();
+
+            state.folder_selected = Some(file_path.parent().unwrap().to_path_buf());
+            state.scrubber = Scrubber::new_from_entries(img_paths);
+            current_path = state.scrubber.get(0).unwrap();
+        }
+
         state.is_loaded = false;
         state.current_image = None;
         state
             .player
-            .load(&file_path, state.message_channel.0.clone());
+            .load(&current_path, state.message_channel.0.clone());
         if let Some(dir) = file_path.parent() {
             state.persistent_settings.last_open_directory = dir.to_path_buf();
         }
-        state.current_path = Some(file_path);
+        state.current_path = Some(current_path);
         _ = state.persistent_settings.save();
     }
 }
