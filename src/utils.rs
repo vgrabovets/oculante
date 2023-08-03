@@ -266,7 +266,9 @@ pub fn send_image_threaded(
             }
             Err(e) => {
                 error!("{e}");
-                _ = message_sender.send(Message::LoadError(e.to_string()));
+                _ = message_sender.send(
+                    Message::LoadError(format!("File {} does not exist", loc.display()))
+                );
             }
         }
     });

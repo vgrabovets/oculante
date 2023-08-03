@@ -3,10 +3,7 @@
 use clap::Arg;
 use clap::Command;
 use clipboard::{ClipboardContext, ClipboardProvider};
-use log::debug;
-use log::error;
-use log::info;
-use log::warn;
+use log::{LevelFilter, debug, error, info, warn};
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
@@ -17,7 +14,7 @@ use shortcuts::key_pressed;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -68,6 +65,19 @@ const TOP_MENU_HEIGHT: f32 = 30.;
 
 #[notan_main]
 fn main() -> Result<(), String> {
+    env_logger::builder()
+        .format(|buf, record| {
+            writeln!(buf,
+                     "{}:{} {} - {}",
+                     record.file().unwrap_or("unknown"),
+                     record.line().unwrap_or(0),
+                     record.level(),
+                     record.args()
+            )
+        })
+        .filter(Some("oculante"), LevelFilter::Debug)
+        .init();
+
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
     }
@@ -694,6 +704,7 @@ fn update(app: &mut App, state: &mut OculanteState) {
                 state.current_image = None;
                 state.is_loaded = true;
                 state.current_texture = None;
+                set_title(app, state);
             },
             _ => (),
         }
