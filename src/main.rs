@@ -13,7 +13,7 @@ use round::round;
 use shortcuts::key_pressed;
 use std::collections::HashSet;
 use std::ffi::OsStr;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -754,6 +754,14 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             } else {
                 state.current_image_is_favourite = false;
             }
+
+            match fs::metadata(current_path) {
+                Ok(metadata) => {
+                    state.image_size = metadata.len();
+                }
+                Err(_) => state.send_message_err("Couldn't get metadata"),
+            }
+
         }
 
         // fill image sequence
@@ -1005,7 +1013,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         // the top menu bar
 
         if state.show_metadata_tooltip && !state.pointer_over_ui && state.cursor_within_image() {
-            let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite {STAR.y} else {0.};
+            let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite { STAR.y } else { 0. };
 
             show_tooltip_at(
                 ctx,
@@ -1013,10 +1021,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 Some(pos2(10., pos_y)),
                 |ui| {
                     ui.label(format!(
-                        "scale: {scale}\nwidth: {width}\nheight: {height}",
-                        scale=round(state.image_geometry.scale as f64, 2),
-                        width=state.image_dimension.0,
-                        height=state.image_dimension.1,
+                        "scale: {scale}\nwidth: {width}\nheight: {height}\nsize: {size}",
+                        scale = round(state.image_geometry.scale as f64, 2),
+                        width = state.image_dimension.0,
+                        height = state.image_dimension.1,
+                        size = format_bytes(state.image_size as f64),
                     ));
                 },
             );

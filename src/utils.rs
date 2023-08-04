@@ -724,3 +724,19 @@ pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
     }
     set_title(app, state);
 }
+
+pub fn format_bytes(bytes: f64) -> String {
+    const KILOBYTE: f64 = 1000.;
+    const MEGABYTE: f64 = KILOBYTE * 1000.;
+    const GIGABYTE: f64 = MEGABYTE * 1000.;
+
+    return if bytes < KILOBYTE {
+        format!("{} bytes", bytes)
+    } else if bytes < MEGABYTE {
+        format!("{:.1} KB", bytes / KILOBYTE)
+    } else if bytes < GIGABYTE {
+        format!("{:.1} MB", bytes / MEGABYTE)
+    } else {
+        format!("{:.1} GB", bytes / GIGABYTE)
+    }
+}
