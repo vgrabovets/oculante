@@ -2,7 +2,6 @@ use crate::utils::is_ext_compatible;
 use anyhow::{bail, Context, Result};
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
-use std::default::Default;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 

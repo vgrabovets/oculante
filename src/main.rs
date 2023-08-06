@@ -3,7 +3,7 @@
 use clap::Arg;
 use clap::Command;
 use clipboard::{ClipboardContext, ClipboardProvider};
-use log::{LevelFilter, debug, error, info, warn};
+use log::{debug, error, info, warn};
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
@@ -24,9 +24,8 @@ pub mod settings;
 pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
-use crate::scrubber::{find_first_image_in_directory, Scrubber};
+use crate::scrubber::{Scrubber, find_first_image_in_directory};
 use crate::shortcuts::InputEvent::*;
-use crate::utils::set_title;
 mod utils;
 use utils::*;
 mod appstate;
@@ -44,10 +43,10 @@ mod ui;
 mod update;
 use ui::*;
 
+mod db;
 use crate::db::{DB, get_db_file};
 use crate::image_editing::EditState;
 
-mod db;
 mod image_editing;
 pub mod paint;
 
@@ -75,7 +74,7 @@ fn main() -> Result<(), String> {
                      record.args()
             )
         })
-        .filter(Some("oculante"), LevelFilter::Debug)
+        .filter(Some("oculante"), log::LevelFilter::Debug)
         .init();
 
     if std::env::var("RUST_LOG").is_err() {

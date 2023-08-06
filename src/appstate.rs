@@ -9,7 +9,6 @@ use image::RgbaImage;
 use nalgebra::Vector2;
 use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
-    default::Default,
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
     time::Instant,
@@ -109,20 +108,17 @@ impl OculanteState {
     }
 
     pub fn reload_image(&mut self) {
-        match self.scrubber.set(self.scrubber.index) {
-            Ok(img_path) => {
-                self.is_loaded = false;
-                self.current_path = Some(img_path.clone());
-                self.player.load(img_path.as_path(), self.message_channel.0.clone());
-            },
-            Err(_) => {
-                self.reset();
-                self.send_message_err("No images");
-            }
+        if let Ok(img_path) = self.scrubber.set(self.scrubber.index) {
+            self.is_loaded = false;
+            self.current_path = Some(img_path.clone());
+            self.player.load(img_path.as_path(), self.message_channel.0.clone());
+        } else {
+            self.reset();
+            self.send_message_err("No images");
         }
     }
 
-    pub fn cursor_within_image(& self) -> bool {
+    pub fn cursor_within_image(&self) -> bool {
         let img_dims_scaled = (
             self.image_dimension.0 as f32 * self.image_geometry.scale,
             self.image_dimension.1 as f32 * self.image_geometry.scale,
@@ -136,14 +132,10 @@ impl OculanteState {
             self.image_geometry.offset[1] + img_dims_scaled.1,
         );
 
-        if img_x.0 <= self.cursor[0]
+        img_x.0 <= self.cursor[0]
             && self.cursor[0] <= img_x.1
             && img_y.0 <= self.cursor[1]
             && self.cursor[1] <= img_y.1
-        {
-            return true;
-        }
-        false
     }
 
     fn reset(&mut self) {

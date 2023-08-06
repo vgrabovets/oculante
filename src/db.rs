@@ -66,7 +66,7 @@ impl DB {
     }
 
     fn prepare_record(&self, img_path: &PathBuf) -> String {
-        img_path.strip_prefix(self.folder.as_path())
+        img_path.strip_prefix(&self.folder)
             .unwrap()
             .components()
             .map(|component| component.as_os_str().to_str().unwrap())
@@ -74,13 +74,9 @@ impl DB {
     }
 
     fn join_path_parts(&self, path_with_tabs: String) -> PathBuf {
-        let mut path = PathBuf::new();
-
-        for part in path_with_tabs.split("\t") {
-            path.push(part);
-        }
-
-        path
+        path_with_tabs.split("\t")
+            .into_iter()
+            .collect()
     }
 }
 
