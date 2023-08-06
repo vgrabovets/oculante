@@ -698,14 +698,12 @@ fn update(app: &mut App, state: &mut OculanteState) {
     if let Ok(msg) = state.message_channel.1.try_recv() {
         debug!("Received message: {:?}", msg);
         state.toast_cooldown = Instant::now();
-        match msg {
-            Message::LoadError(_) => {
-                state.current_image = None;
-                state.is_loaded = true;
-                state.current_texture = None;
-                set_title(app, state);
-            },
-            _ => (),
+
+        if let Message::LoadError(_) = msg {
+            state.current_image = None;
+            state.is_loaded = true;
+            state.current_texture = None;
+            set_title(app, state);
         }
 
         state.message = Some(msg);
