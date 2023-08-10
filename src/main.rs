@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{self, BufRead, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 pub mod cache;
@@ -746,11 +746,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
         set_title(app, state);
 
         if let Some(current_path) = &state.current_path {
-            if state.scrubber.favourites.contains(current_path) {
-                state.current_image_is_favourite = true;
-            } else {
-                state.current_image_is_favourite = false;
-            }
+            state.current_image_is_favourite = state.scrubber.favourites.contains(current_path);
 
             match fs::metadata(current_path) {
                 Ok(metadata) => {
@@ -1175,9 +1171,8 @@ fn browse_for_image_path(state: &mut OculanteState, app: &mut App) {
             let reader = io::BufReader::new(file);
             let img_paths: Vec<PathBuf> = reader
                 .lines()
-                .into_iter()
-                .filter_map(|line| {line.ok()})
-                .map(|line| {Path::new(&line).to_path_buf()})
+                .filter_map(Result::ok)
+                .map(PathBuf::from)
                 .collect();
 
             state.folder_selected = Some(file_path.parent().unwrap().to_path_buf());
