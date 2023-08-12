@@ -15,7 +15,7 @@ pub struct DB {
 impl DB {
     pub fn new(folder: &PathBuf) -> Self {
         debug!("init new DB connection");
-        let db_file_path = get_db_file(&folder);
+        let db_file_path = get_db_file(folder);
         let connection = Connection::open(db_file_path).expect("cannot open DB connection");
         connection.execute(
             "create table if not exists favourites (path text primary key)",
@@ -23,7 +23,7 @@ impl DB {
         ).expect("cannot create table");
         let folder_out = folder.clone();
 
-        Self {connection: Some(connection), folder: folder_out}
+        Self { connection: Some(connection), folder: folder_out }
     }
 
     pub fn insert(&self, img_path: &PathBuf) {
@@ -53,7 +53,7 @@ impl DB {
             .expect("cannot prepare query");
 
         stmt
-            .query_map((), |row| { Ok(row.get(0)?) })
+            .query_map((), |row| { row.get(0) })
             .expect("cannot get data")
             .map(|e| self.folder.join(self.join_path_parts(e.unwrap())))
             .filter(|file| file.exists())
@@ -65,7 +65,7 @@ impl DB {
         self.connection.take().unwrap().close().expect("cannot close DB connection")
     }
 
-    fn prepare_record(&self, img_path: &PathBuf) -> String {
+    fn prepare_record(&self, img_path: &Path) -> String {
         img_path.strip_prefix(&self.folder)
             .unwrap()
             .components()
@@ -74,12 +74,10 @@ impl DB {
     }
 
     fn join_path_parts(&self, path_with_tabs: String) -> PathBuf {
-        path_with_tabs.split("\t")
-            .into_iter()
-            .collect()
+        path_with_tabs.split('\t').collect()
     }
 }
 
-pub fn get_db_file(folder: &PathBuf) -> PathBuf {
+pub fn get_db_file(folder: &Path) -> PathBuf {
     folder.join(Path::new(FAVOURITES_DB))
 }

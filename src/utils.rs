@@ -730,7 +730,7 @@ pub fn format_bytes(bytes: f64) -> String {
     const MEGABYTE: f64 = KILOBYTE * 1000.;
     const GIGABYTE: f64 = MEGABYTE * 1000.;
 
-    return if bytes < KILOBYTE {
+    if bytes < KILOBYTE {
         format!("{} bytes", bytes)
     } else if bytes < MEGABYTE {
         format!("{:.1} KB", bytes / KILOBYTE)

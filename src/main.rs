@@ -1171,7 +1171,7 @@ fn browse_for_image_path(state: &mut OculanteState, app: &mut App) {
             let reader = io::BufReader::new(file);
             let img_paths: Vec<PathBuf> = reader
                 .lines()
-                .filter_map(Result::ok)
+                .map_while(Result::ok)
                 .map(PathBuf::from)
                 .collect();
 
@@ -1204,7 +1204,7 @@ fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
 
     if let Some(folder_path) = folder_dialog_result {
         state.persistent_settings.last_open_directory = folder_path.clone();
-        _ = state.persistent_settings.save();
+        state.persistent_settings.save();
         state.folder_selected = Some(folder_path.clone());
 
         let db_file = get_db_file(&folder_path);
@@ -1288,12 +1288,12 @@ fn add_to_favourites(state: &mut OculanteState) {
         }
 
         if !state.scrubber.favourites.contains(img_path) {
-            state.db.as_ref().unwrap().insert(&img_path);
+            state.db.as_ref().unwrap().insert(img_path);
             state.scrubber.favourites.insert(img_path.clone());
             state.current_image_is_favourite = true;
 
         } else {
-            state.db.as_ref().unwrap().delete(&img_path);
+            state.db.as_ref().unwrap().delete(img_path);
             state.scrubber.favourites.remove(img_path);
             state.current_image_is_favourite = false;
         }
