@@ -180,7 +180,7 @@ pub fn find_first_image_in_directory(folder_path: &PathBuf) -> Result<PathBuf> {
 
 fn insert_after_every(main_vector: Vec<PathBuf>, other_vector: Vec<PathBuf>, after: usize) -> Vec<PathBuf> {
     let mut result = Vec::with_capacity(main_vector.len());
-    let other_vector_set: HashSet<PathBuf> = other_vector.clone().into_iter().collect();
+    let other_vector_set: HashSet<PathBuf> = other_vector.iter().cloned().collect();
 
     if after == 0 {
         result.extend_from_slice(&other_vector);
