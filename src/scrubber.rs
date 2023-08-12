@@ -30,14 +30,7 @@ impl Scrubber {
         )
             .unwrap_or_default();
         let index = entries.iter().position(|p| p == path).unwrap_or_default();
-
-        let favourites_out: HashSet<PathBuf>;
-
-        if favourites.is_some() {
-            favourites_out = favourites.unwrap();
-        } else {
-            favourites_out = Default::default();
-        }
+        let favourites_out: HashSet<PathBuf> = favourites.unwrap_or_default();
 
         Self {
             index,
@@ -84,12 +77,7 @@ impl Scrubber {
         if self.entries.is_empty() {
             return Err("Scrubber has no entries".to_string());
         }
-
-        if index < self.entries.len() {
-            self.index = index;
-        } else {
-            self.index = self.entries.len() - 1;
-        }
+        self.index = std::cmp::min(index, self.entries.len() - 1);
         Ok(self.entries[self.index].clone())
     }
 
@@ -115,13 +103,13 @@ impl Scrubber {
 // TODO: Should probably return an Result<T,E> instead, but am too lazy to figure out + handle a dedicated error type here
 // TODO: Cache this result, instead of doing it each time we need to fetch another file from the folder
 pub fn get_image_filenames_for_directory(
-    folder_path: &Path,
+    path: &Path,
     randomize: bool,
     walk_files: bool,
     favourites: &Option<HashSet<PathBuf>>,
     intersperse_with_favs_every_n: usize,
 ) -> Result<Vec<PathBuf>> {
-    let mut folder_path = folder_path.to_path_buf();
+    let mut folder_path = path.to_path_buf();
     if folder_path.is_file() {
         folder_path = folder_path
             .parent()
@@ -129,23 +117,21 @@ pub fn get_image_filenames_for_directory(
             .context("Can't get parent")?;
     }
 
-    let mut dir_files: Vec<PathBuf>;
-
-    if walk_files {
-        dir_files = WalkDir::new(folder_path)
+    let mut dir_files: Vec<PathBuf> = if walk_files {
+        WalkDir::new(folder_path)
             .into_iter()
-            .filter_map(|v| v.ok())
-            .map(|entry| entry.into_path())
+            .filter_map(Result::ok)
+            .map(|entry| entry.path().to_path_buf())
             .filter(|x| is_ext_compatible(x))
-            .collect::<Vec<PathBuf>>();
+            .collect()
     } else {
         let info = std::fs::read_dir(folder_path)?;
-        dir_files = info
-            .flat_map(|x| x)
-            .map(|x| x.path())
+        info
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
             .filter(|x| is_ext_compatible(x))
-            .collect::<Vec<PathBuf>>();
-    }
+            .collect()
+    };
 
     // TODO: Are symlinks handled correctly?
 
@@ -169,7 +155,7 @@ pub fn get_image_filenames_for_directory(
     }
 
     dir_files = insert_after_every(dir_files, favourites_vec, intersperse_with_favs_every_n);
-    return Ok(dir_files);
+    Ok(dir_files)
 }
 
 /// Find first valid image from the directory

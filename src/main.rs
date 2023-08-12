@@ -1205,20 +1205,19 @@ fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
     if let Some(folder_path) = folder_dialog_result {
         state.persistent_settings.last_open_directory = folder_path.clone();
         _ = state.persistent_settings.save();
-        state.folder_selected = Option::from(folder_path.clone());
+        state.folder_selected = Some(folder_path.clone());
 
         let db_file = get_db_file(&folder_path);
 
-        let favourites: Option<HashSet<PathBuf>>;
-        if db_file.exists() {
-            state.db = Option::from(DB::new(&folder_path));
-            favourites = Option::from(state.db.as_ref().unwrap().get_all());
+        let favourites: Option<HashSet<PathBuf>> = if db_file.exists() {
+            state.db = Some(DB::new(&folder_path));
+            Some(state.db.as_ref().unwrap().get_all())
         } else {
-            favourites = None;
-        }
+            None
+        };
 
         state.scrubber = Scrubber::new(
-            &folder_path.as_path(),
+            folder_path.as_path(),
             true,
             true,
             favourites,
@@ -1228,11 +1227,11 @@ fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
         let number_of_favs = state.scrubber.favourites.len();
         if number_of_files > 0 {
             state.send_message(
-                format!(
+                &format!(
                     "files: {}, favourites: {}",
                     number_of_files,
                     number_of_favs,
-                ).as_str(),
+                ),
             );
             let current_path = state.scrubber.get(0).unwrap();
 
@@ -1244,7 +1243,7 @@ fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
 
             state.current_path = Some(current_path);
         } else {
-            state.send_message_err(format!("No supported image files in {:?}", folder_path).as_str());
+            state.send_message_err(&format!("No supported image files in {:?}", folder_path));
         }
     }
 }
@@ -1285,7 +1284,7 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
 fn add_to_favourites(state: &mut OculanteState) {
     if let Some(img_path) = &state.current_path {
         if state.db.is_none() {
-            state.db = Option::from(DB::new(state.folder_selected.as_ref().unwrap()));
+            state.db = Some(DB::new(state.folder_selected.as_ref().unwrap()));
         }
 
         if !state.scrubber.favourites.contains(img_path) {
