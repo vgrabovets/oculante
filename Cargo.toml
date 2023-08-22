@@ -11,7 +11,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.6.69-dev4"
+version = "0.7.2"
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
@@ -65,6 +65,7 @@ tiff = "0.9"
 jxl-oxide = "0.3.0"
 zune-png = "0.2"
 walkdir = "2.3.3"
+img-parts = "0.3.0"
 
 [features]
 avif_native = ["avif-decode"]

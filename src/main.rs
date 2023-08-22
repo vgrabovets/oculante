@@ -646,6 +646,16 @@ fn update(app: &mut App, state: &mut OculanteState) {
         app.window().set_always_on_top(false);
     }
 
+    // Save every 1.5 secs
+    let t = app.timer.time_since_init()  % 1.5;
+    if t <= 0.01 {
+        state.persistent_settings.window_geometry = (app.window().position(), app.window().size());
+        state.persistent_settings.save_blocking();
+        debug!("Save {t}");
+    }
+
+   
+
     let mouse_pos = app.mouse.position();
 
     state.mouse_delta = Vector2::new(mouse_pos.0, mouse_pos.1) - state.cursor;
@@ -1059,6 +1069,11 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             Message::Error(txt) | Message::LoadError(txt) => {
                                 ui.colored_label(Color32::RED, format!("🕱 {txt}"));
                             }
+                            Message::Saved(path) => {
+                                ui.colored_label(Color32::RED, format!("Saved!"));
+                                state.current_path = Some(path.clone());
+                                set_title(app, state);
+                            }
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
                             if ui.small_button("🗙").clicked() {
@@ -1071,9 +1086,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 },
             );
 
-            // using delta does not work with rfd
             // state.toast_cooldown += app.timer.delta_f32();
-            // debug!("cooldown {}", state.toast_cooldown);
 
             if state.toast_cooldown.elapsed() > Duration::from_secs(3u64) {
                 state.message = None;
@@ -1141,7 +1154,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
     draw.clear(Color::from_rgb(
         c[0] as f32 / 255.,
         c[1] as f32 / 255.,
-        c[1] as f32 / 255.,
+        c[2] as f32 / 255.,
     ));
     gfx.render(&draw);
     gfx.render(&egui_output);

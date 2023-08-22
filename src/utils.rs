@@ -2,6 +2,7 @@ use arboard::Clipboard;
 
 // use image::codecs::gif::GifDecoder;
 
+use img_parts::{Bytes, DynImage, ImageEXIF};
 use log::{debug, error, info};
 use nalgebra::{clamp, Vector2};
 use notan::graphics::Texture;
@@ -12,11 +13,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use image::{self};
 use image::{EncodableLayout, Rgba, RgbaImage};
 use std::sync::mpsc::{self};
@@ -24,7 +26,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use strum::Display;
 use strum_macros::EnumIter;
 
-use crate::appstate::{ImageGeometry, OculanteState, Message};
+use crate::appstate::{ImageGeometry, Message, OculanteState};
 use crate::cache::Cache;
 use crate::image_editing::{self, ImageOperation};
 use crate::image_loader::open_image;
@@ -40,7 +42,7 @@ fn is_pixel_fully_transparent(p: &Rgba<u8>) -> bool {
     p.0 == [0, 0, 0, 0]
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExtendedImageInfo {
     pub num_pixels: usize,
     pub num_transparent_pixels: usize,
@@ -49,6 +51,7 @@ pub struct ExtendedImageInfo {
     pub green_histogram: Vec<(i32, i32)>,
     pub blue_histogram: Vec<(i32, i32)>,
     pub exif: HashMap<String, String>,
+    pub raw_exif: Option<Bytes>,
     pub name: String,
 }
 
@@ -59,10 +62,17 @@ impl ExtendedImageInfo {
             return Ok(());
         }
 
-        let file = std::fs::File::open(image_path)?;
-        let mut bufreader = std::io::BufReader::new(&file);
+        let input = std::fs::read(image_path)?;
+
+        // Store original EXIF to write in in case of save event
+        if let Some(d) = DynImage::from_bytes(input.clone().into())? {
+            self.raw_exif = d.exif()
+        }
+
+        // User-friendly Exif in key/value form
+        let mut c = Cursor::new(input);
         let exifreader = exif::Reader::new();
-        let exif = exifreader.read_from_container(&mut bufreader)?;
+        let exif = exifreader.read_from_container(&mut c)?;
         for f in exif.fields() {
             self.exif.insert(
                 f.tag.to_string(),
@@ -119,6 +129,7 @@ impl ExtendedImageInfo {
             blue_histogram,
             green_histogram,
             red_histogram,
+            raw_exif: Default::default(),
             name: Default::default(),
             exif: Default::default(),
         }
@@ -284,7 +295,6 @@ pub enum FrameSource {
     AnimationStart,
     Still,
     EditResult,
-    // AnimationEnd,
 }
 
 /// A single frame
@@ -739,4 +749,15 @@ pub fn format_bytes(bytes: f64) -> String {
     } else {
         format!("{:.1} GB", bytes / GIGABYTE)
     }
+}
+
+/// Fix missing exif by re-applying exif to saved files
+pub fn fix_exif(p: &Path, exif: Option<Bytes>) -> Result<()> {
+    use std::fs::{self, File};
+    let input = fs::read(p)?;
+    let mut dynimage = DynImage::from_bytes(input.into())?.context("Unsupported EXIF format")?;
+    dynimage.set_exif(exif);
+    let output = File::create(p)?;
+    dynimage.encoder().write_to(output)?;
+    Ok(())
 }
