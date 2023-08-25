@@ -1,13 +1,13 @@
 #[cfg(feature = "file_open")]
 use crate::{browse_for_folder_path, browse_for_image_path};
 use crate::{
-    appstate::{ImageGeometry, OculanteState},
-    image_editing::{process_pixels, Channel, ImageOperation, ScaleFilter},
+    appstate::{ImageGeometry, OculanteState, Message},
+    image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
     set_zoom,
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
-        clipboard_copy, disp_col, disp_col_norm, highlight_bleed, highlight_semitrans,
+        clipboard_copy, disp_col, disp_col_norm, fix_exif, highlight_bleed, highlight_semitrans,
         load_image_from_path, next_image, prev_image, send_extended_info, set_title, solo_channel,
         toggle_fullscreen, unpremult, ColorChannel, ImageExt,
     },
@@ -180,6 +180,13 @@ impl EguiExt for Ui {
 
 pub fn info_ui(ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     if let Some(img) = &state.current_image {
+        let mut img = img;
+        
+        // prefer edit result if present
+        if state.edit_state.result_pixel_op.width() > 0 {
+            img = &state.edit_state.result_pixel_op;
+        }
+
         if let Some(p) = img.get_pixel_checked(
             state.cursor_relative.x as u32,
             state.cursor_relative.y as u32,
@@ -620,6 +627,7 @@ pub fn advanced_ui(ui: &mut Ui, state: &mut OculanteState) {
 }
 
 /// Everything related to image editing
+#[allow(unused_variables)]
 pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mut Graphics) {
     egui::SidePanel::right("editing")
         .min_width(100.)
@@ -660,6 +668,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         ImageOperation::Mult([255, 255, 255]),
                         ImageOperation::Fill([255, 255, 255, 255]),
                         ImageOperation::Blur(0),
+                        ImageOperation::GradientMap(vec![GradientStop::new(0, [155,33,180]), GradientStop::new(128, [255,83,0]),GradientStop::new(255, [224,255,0])]),
                         ImageOperation::MMult,
                         ImageOperation::MDiv,
                         ImageOperation::Expression("r = 1.0".into()),
@@ -1057,6 +1066,7 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                         .clicked()
                     {
                         state.is_loaded = false;
+                        state.player.cache.clear();
                         state.player.load(&path, state.message_channel.0.clone());
                     }
                 }
@@ -1108,28 +1118,51 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                 #[cfg(feature = "file_open")]
                 if state.current_image.is_some() {
                     if ui.button("Save as...").clicked() {
-                        let start_directory = &state.persistent_settings.last_open_directory;
-                        let file_dialog_result = rfd::FileDialog::new()
-                            .set_directory(start_directory)
-                            .save_file();
-                        if let Some(file_path) = file_dialog_result {
-                            debug!("Selected File Path = {:?}", file_path);
-                            match state
-                                .edit_state
-                                .result_pixel_op
-                                .save(&file_path) {
-                                Ok(_) => {
-                                    state.send_message("Saved");
-                                    state.current_path = Some(file_path);
-                                    set_title(app, state);
-                                }
-                                Err(e) => {
-                                    state.send_message_err(&format!("Error: Could not save: {e}"));
-                                }
-                            }
-                            state.toast_cooldown = Instant::now();
-                            ui.ctx().request_repaint();
-                        }
+                        let start_directory = state.persistent_settings.last_open_directory.clone();
+
+                        let image_to_save = state.edit_state.result_pixel_op.clone();
+                        let msg_sender = state.message_channel.0.clone();
+                        let err_sender = state.message_channel.0.clone();
+                        let image_info = state.image_info.clone();
+
+                        std::thread::spawn(move || {
+                            let file_dialog_result = rfd::FileDialog::new()
+                                .set_directory(start_directory)
+                                .save_file();
+                        
+                                if let Some(file_path) = file_dialog_result {
+
+
+                                    debug!("Selected File Path = {:?}", file_path);
+        
+        
+                                    match image_to_save
+                                        .save(&file_path) {
+                                            Ok(_) => {
+                                                _ = msg_sender.send(Message::Saved(file_path.clone()));
+                                                debug!("Saved to {}", file_path.display());
+                                                // Re-apply exif
+                                                if let Some(info) = &image_info {
+                                                    // before doing anything, make sure we have raw exif data
+                                                    if info.raw_exif.is_some() {
+                                                        if let Err(e) = fix_exif(&file_path, info.raw_exif.clone()) {
+                                                            error!("{e}");
+                                                        } else {
+                                                            info!("Saved EXIF.")
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                _ = err_sender.send(Message::err(&format!("Error: Could not save: {e}")));
+                                            }
+                                        }
+                                        // state.toast_cooldown = 0.0;
+                                    }
+                        
+                        });
+
+                                    ui.ctx().request_repaint();
                     }
                 }
 
@@ -1149,7 +1182,20 @@ pub fn edit_ui(app: &mut App, ctx: &Context, state: &mut OculanteState, gfx: &mu
                             .result_pixel_op
                             .save(p) {
                             Ok(_) => {
+                                debug!("Saved to {}", p.display());
+
                                 state.send_message("Saved");
+                                //Re-apply exif
+                                if let Some(info) = &state.image_info {
+                                    // before doing anything, make sure we have raw exif data
+                                    if info.raw_exif.is_some() {
+                                        if let Err(e) = fix_exif(&p, info.raw_exif.clone()) {
+                                            error!("{e}");
+                                        } else {
+                                            info!("Saved EXIF.")
+                                        }
+                                    }
+                                }
                             }
                             Err(e) => {
                                 state.send_message(&format!("Could not save: {e}"));
@@ -1704,7 +1750,6 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
                 }
             }
         }
-
 
         if state.current_path.is_some() {
             if tooltip(

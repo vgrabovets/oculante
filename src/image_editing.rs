@@ -10,7 +10,7 @@ use fast_image_resize as fr;
 use image::{imageops, RgbaImage};
 use log::{debug, error};
 use nalgebra::Vector4;
-use notan::egui::{self, DragValue, Sense, Vec2};
+use notan::egui::{self, lerp, DragValue, Sense, Vec2};
 use notan::egui::{Response, Ui};
 use palette::{rgb::Rgb, Hsl, IntoColor};
 use rand::{thread_rng, Rng};
@@ -20,8 +20,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EditState {
     #[serde(skip)]
+    /// The final result of image modifications 
     pub result_pixel_op: RgbaImage,
     #[serde(skip)]
+    /// The image after all non-per-pixel operations completed (expensive, so only updated if changed)
     pub result_image_op: RgbaImage,
     pub painting: bool,
     pub non_destructive_painting: bool,
@@ -95,6 +97,7 @@ pub enum ImageOperation {
     Expression(String),
     Desaturate(u8),
     Posterize(u8),
+    GradientMap(Vec<GradientStop>),
     Exposure(i32),
     Equalize((i32, i32)),
     Mult([u8; 3]),
@@ -147,6 +150,7 @@ impl fmt::Display for ImageOperation {
             Self::HSV(_) => write!(f, "◔ HSV"),
             Self::ChromaticAberration(_) => write!(f, "📷 Color Fringe"),
             Self::Resize { .. } => write!(f, "⬜ Resize"),
+            Self::GradientMap { .. } => write!(f, "🗠 Gradient Map"),
             Self::Expression(_) => write!(f, "📄 Expression"),
             Self::MMult => write!(f, "✖ Multiply with alpha"),
             Self::MDiv => write!(f, "➗ Divide by alpha"),
@@ -160,6 +164,7 @@ impl ImageOperation {
         match self {
             Self::Blur(_) => false,
             Self::Resize { .. } => false,
+            // Self::GradientMap { .. } => false,
             Self::Crop(_) => false,
             Self::Rotate(_) => false,
             Self::Flip(_) => false,
@@ -238,6 +243,183 @@ impl ImageOperation {
                     r.changed = true
                 }
                 r
+            }
+
+            Self::GradientMap(pts) => {
+                ui.vertical(|ui| {
+                    use egui::epaint::*;
+
+                    const RECT_WIDTH: usize = 255;
+
+                    let (gradient_rect, mut response) =
+                        ui.allocate_at_least(vec2(RECT_WIDTH as f32, 50.), Sense::click_and_drag());
+
+                    let mut len_with_extra_pts = pts.len();
+                    let len = pts.len();
+                    if len < 2 {
+                        error!("You need at least two points in your gradient");
+                    }
+                    let mut mesh = Mesh::default();
+
+                    let mut i: usize = 0;
+
+                    // paint gradient
+                    for &color in pts.iter() {
+                        let t = color.pos as f32 / u8::MAX as f32;
+                        let x = lerp(gradient_rect.x_range(), t);
+                        let egui_color =
+                            // Color32::from_rgb(color.1[0], color.1[1], color.1[2]).additive();
+                            Color32::from_rgb(color.r(), color.g(), color.b());
+
+                        // if first point is shifted, so we clamp and insert first
+                        if i == 0 && color.pos > 0 {
+                            let x = gradient_rect.left();
+                            mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                            mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
+                            mesh.add_triangle(2 * i as u32, 2 * i as u32 + 1, 2 * i as u32 + 2);
+                            mesh.add_triangle(2 * i as u32 + 1, 2 * i as u32 + 2, 2 * i as u32 + 3);
+                            i += 1;
+                            len_with_extra_pts += 1;
+                        }
+
+                        // draw regular point
+                        mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                        mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
+                        if i < len_with_extra_pts - 1 {
+                            let i = i as u32;
+                            mesh.add_triangle(2 * i, 2 * i + 1, 2 * i + 2);
+                            mesh.add_triangle(2 * i + 1, 2 * i + 2, 2 * i + 3);
+                        }
+
+                        // if last point is shifted, insert extra one at end
+                        if i == len_with_extra_pts - 1 && color.pos < RECT_WIDTH as u8 {
+                            let x = gradient_rect.right();
+                            mesh.colored_vertex(pos2(x, gradient_rect.top()), egui_color);
+                            mesh.colored_vertex(pos2(x, gradient_rect.bottom()), egui_color);
+                            mesh.add_triangle(2 * i as u32, 2 * i as u32 + 1, 2 * i as u32 + 2);
+                            mesh.add_triangle(2 * i as u32 + 1, 2 * i as u32 + 2, 2 * i as u32 + 3);
+                            i += 1;
+                            len_with_extra_pts += 1;
+                        }
+                        i += 1;
+                    }
+
+                    ui.painter().add(Shape::mesh(mesh));
+
+                    let pts_cpy = pts.clone();
+
+                    for (ptnum, gradient_stop) in pts.iter_mut().enumerate() {
+                        let mut is_hovered = false;
+
+                        if let Some(hover) = response.hover_pos() {
+                            let mouse_pos_in_gradient =
+                                (hover.x - gradient_rect.left()).clamp(0.0, 255.) as i32;
+
+                            // check which point is closest
+
+                            if closest_pt(&pts_cpy, mouse_pos_in_gradient as u8) as usize == ptnum {
+                                is_hovered = true;
+
+                                // on click, set the id
+                                if ui
+                                    .ctx()
+                                    .input()
+                                    .pointer
+                                    .button_down(egui::PointerButton::Primary)
+                                    && ui
+                                        .ctx()
+                                        .data()
+                                        .get_temp::<usize>("gradient".into())
+                                        .is_none()
+                                {
+                                    ui.ctx()
+                                        .data()
+                                        .insert_temp::<usize>("gradient".into(), gradient_stop.id);
+                                    debug!("insert");
+                                }
+                            }
+
+                            // Button down: move point with matching id
+                            if ui
+                                .ctx()
+                                .input()
+                                .pointer
+                                .button_down(egui::PointerButton::Primary)
+                                && ui.ctx().data().get_temp::<usize>("gradient".into())
+                                    == Some(gradient_stop.id)
+                            {
+                                gradient_stop.pos = mouse_pos_in_gradient as u8;
+                                response.mark_changed();
+                            }
+                        }
+
+                        if ui.ctx().input().pointer.any_released() {
+                            ui.ctx().data().remove::<usize>("gradient".into());
+                            debug!("clear dta");
+                        }
+
+                        ui.painter().vline(
+                            gradient_rect.left() + gradient_stop.pos as f32,
+                            gradient_rect.bottom()..=(gradient_rect.top() + 25.),
+                            Stroke::new(
+                                if is_hovered { 4. } else { 1. },
+                                Color32::from_rgb(
+                                    255 - gradient_stop.r(),
+                                    255 - gradient_stop.r(),
+                                    255 - gradient_stop.r(),
+                                ),
+                            ),
+                        );
+                    }
+
+                    let mut delete = None;
+                    for (i, p) in pts.iter_mut().enumerate() {
+                        ui.horizontal(|ui| {
+                            if ui.color_edit_button_srgb(&mut p.col).changed() {
+                                response.mark_changed();
+                            }
+
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut p.pos)
+                                        .speed(0.1)
+                                        .clamp_range(0..=255)
+                                        .custom_formatter(|n, _| {
+                                            let n = n / 256.;
+                                            format!("{n:.2}")
+                                        })
+                                        .suffix(" pos"),
+                                )
+                                .changed()
+                            {
+                                response.mark_changed();
+                            }
+
+                            // make sure we have at least two points
+                            if len > 2 {
+                                if ui.button("🗑").clicked() {
+                                    delete = Some(i);
+                                }
+                            }
+                        });
+                    }
+
+                    if ui.button("Add point").clicked() {
+                        pts.push(GradientStop::new(128, [0, 0, 0]));
+                        response.mark_changed();
+                    }
+                    if let Some(del) = delete {
+                        pts.remove(del);
+                        response.mark_changed();
+                    }
+
+                    // Make sure points are monotonic ascending by position
+
+                    pts.sort_by(|a, b| a.pos.cmp(&b.pos));
+
+                    response
+                })
+                .inner
             }
             Self::Flip(horizontal) => {
                 let mut r = ui.radio_value(horizontal, true, "V");
@@ -603,6 +785,16 @@ impl ImageOperation {
                 p[1] = egui::lerp(bounds.0..=bounds.1, p[1]);
                 p[2] = egui::lerp(bounds.0..=bounds.1, p[2]);
             }
+
+            Self::GradientMap(col) => {
+                let brightness = 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+                // let res = interpolate_spline(col, brightness);
+                // let res = interpolate(col, brightness);
+                let res = interpolate_u8(col, (brightness * 255.) as u8);
+                p[0] = res[0] as f32 / 255.;
+                p[1] = res[1] as f32 / 255.;
+                p[2] = res[2] as f32 / 255.;
+            }
             Self::Expression(expr) => {
                 let mut context = context_map! {
                     "r" => p[0] as f64,
@@ -830,4 +1022,119 @@ pub fn lossless_tx(p: &std::path::Path, transform: turbojpeg::Transform) -> anyh
     // write the changed JPEG back to disk
     std::fs::write(p, &transformed_data)?;
     Ok(())
+}
+
+fn interpolate_u8(data: &Vec<GradientStop>, pt: u8) -> [u8; 3] {
+    // debug!("Pt is {pt}");
+
+    for i in 0..data.len() {
+        let current = data[i];
+
+        // return direct hit
+        if current.pos == pt {
+            return current.col;
+        }
+
+        // pt is below first stop
+        if i == 0 && current.pos > pt {
+            return current.col;
+        }
+
+        if let Some(next) = data.get(i + 1) {
+            if current.pos < pt && next.pos > pt {
+                let range = next.pos - current.pos;
+                let pos_in_range = pt - current.pos;
+                let rel = pos_in_range as f32 / range as f32;
+
+                let r = lerp(current.r() as f32..=next.r() as f32, rel) as u8;
+                let g = lerp(current.g() as f32..=next.g() as f32, rel) as u8;
+                let b = lerp(current.b() as f32..=next.b() as f32, rel) as u8;
+
+                return [r, g, b];
+            }
+        } else {
+            return current.col;
+            //this was the last point
+        }
+    }
+
+    [0, 255, 0]
+}
+
+fn closest_pt(data: &Vec<GradientStop>, value: u8) -> usize {
+    // go thru all points of gradient
+    for (i, current) in data.iter().enumerate() {
+        // make sure there is a next point
+        if let Some(next) = data.get(i + 1) {
+            // clamped left: special case
+            if value <= current.pos && i == 0 {
+                return 0;
+            }
+
+            //is this value between these?
+            if current.pos <= value && next.pos >= value {
+                let l_dist = (value as i32 - current.pos as i32).abs();
+                let r_dist = (next.pos as i32 - value as i32).abs();
+                if l_dist <= r_dist {
+                    return i;
+                } else {
+                    return i + 1;
+                }
+            }
+        } else {
+            return i;
+        }
+    }
+    0
+    // res
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+pub struct GradientStop {
+    pub id: usize,
+    pub pos: u8,
+    pub col: [u8; 3],
+}
+
+impl GradientStop {
+    fn r(&self) -> u8 {
+        self.col[0]
+    }
+    fn g(&self) -> u8 {
+        self.col[1]
+    }
+    fn b(&self) -> u8 {
+        self.col[2]
+    }
+
+    pub fn new(pos: u8, rgb: [u8; 3]) -> Self {
+        GradientStop {
+            id: rand::thread_rng().gen(),
+            pos,
+            col: rgb,
+        }
+    }
+}
+
+#[test]
+fn range_test() {
+    // for i in [0.0, 0.25,0.5, 0.75, 1.0] {
+    //     let r = map_range(i, 0.0, 1.0,0.5, 1.0,);
+    //     dbg!(r);
+    //     let r1 = map_between_ranges(r, 0.5, 1.0,0., 1.0,);
+    //     // let r = map_range(r, 0.5, 1.0,0.0, 1.0,);
+    //     dbg!(r1);
+
+    // }
+
+    let map = vec![
+        GradientStop::new(0, [155, 33, 180]),
+        GradientStop::new(128, [255, 83, 0]),
+        GradientStop::new(255, [224, 255, 0]),
+    ];
+    std::env::set_var("RUST_LOG", "debug");
+    let _ = env_logger::try_init();
+    let res = interpolate_u8(&map, 5);
+
+    debug!("result: {:?}", res);
 }
