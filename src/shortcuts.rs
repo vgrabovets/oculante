@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 // use hashbrown::{HashMap, HashSet};
 use log::{debug, error};
 // use std::collections::HashMap;
@@ -7,7 +7,7 @@ use crate::OculanteState;
 use notan::prelude::App;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum InputEvent {
     AlwaysOnTop,
     Fullscreen,
@@ -50,9 +50,9 @@ pub enum InputEvent {
     ToggleSlideshow,
 }
 
-pub type Shortcuts = HashMap<InputEvent, SimultaneousKeypresses>;
+pub type Shortcuts = BTreeMap<InputEvent, SimultaneousKeypresses>;
 
-pub type SimultaneousKeypresses = HashSet<String>;
+pub type SimultaneousKeypresses = BTreeSet<String>;
 
 pub trait ShortcutExt {
     fn default_keys() -> Self
