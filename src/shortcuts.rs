@@ -36,6 +36,7 @@ pub enum InputEvent {
     PanRight,
     PanUp,
     PanDown,
+    DeleteFile,
     LosslessRotateRight,
     LosslessRotateLeft,
     Copy,
@@ -46,7 +47,6 @@ pub enum InputEvent {
     ZenMode,
     Favourite,
     CopyImagePathToClipboard,
-    DeleteFile,
     ToggleSlideshow,
 }
 

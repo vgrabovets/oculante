@@ -11,7 +11,7 @@ license = "MIT"
 name = "oculante"
 readme = "README.md"
 repository = "https://github.com/woelper/oculante/"
-version = "0.7.5-dev2"
+version = "0.7.6"
 
 [package.metadata.bundle]
 icon = ["res/oculante.png"]
@@ -48,7 +48,7 @@ rand = "0.8"
 rand_chacha = "0.3"
 rayon = "1.7"
 resvg = "0.33.0"
-rfd = {version = "0.11", optional = true}
+rfd = {version = "0.12", optional = true}
 rgb = "0.8"
 round = "0.1.2"
 self_update = {version = "0.37", default-features = false, features = ["rustls"], optional = true}
@@ -57,12 +57,11 @@ serde_json = "1.0"
 strum = {version = "0.25", features = ["derive"]}
 strum_macros = "0.25"
 tiny-skia = "0.9"
-trash = "3.0.3"
 turbojpeg = {version = "0.5", features = ["image"], optional = true}
 usvg = "0.33.0"
 webbrowser = "0.8"
 tiff = "0.9"
-jxl-oxide = "0.3.0"
+jxl-oxide = "0.4"
 zune-png = "0.2"
 walkdir = "2.3.3"
 img-parts = "0.3.0"
@@ -84,6 +83,9 @@ rusqlite = "0.29.0"
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = {version = "0.29.0", features = ["winsqlite3"]}
+
+[target.'cfg(not(target_os = "netbsd"))'.dependencies]
+trash = {version = "3"}
 
 [target.'cfg(windows)'.build-dependencies]
 # this currently causes a link error LNK1356, check in the future if the problem was solved
