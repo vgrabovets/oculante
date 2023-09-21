@@ -411,11 +411,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.toggle_slideshow = !state.toggle_slideshow;
             }
             if key_pressed(app, state, DeleteFile) {
-                if let Some(img_path) = &state.current_path {
-                    trash::delete(img_path).expect("Cannot delete file");
-                    state.send_message(format!("file {:?} removed", img_path).as_str());
-                    state.scrubber.delete(img_path);
-                    state.reload_image();
+                if state.current_path.is_some() {
+                    delete_current_image(state);
                 }
             }
             if key_pressed(app, state, Quit) {
@@ -1348,5 +1345,15 @@ fn add_to_favourites(state: &mut OculanteState) {
             state.scrubber.favourites.remove(img_path);
             state.current_image_is_favourite = false;
         }
+    }
+}
+
+fn delete_current_image(state: &mut OculanteState) {
+    if state.current_path.is_some() {
+        let img_path = state.current_path.as_ref().unwrap();
+        trash::delete(&img_path).expect("Cannot delete file");
+        state.send_message(format!("file {:?} removed", img_path).as_str());
+        state.scrubber.delete(&img_path);
+        state.reload_image();
     }
 }

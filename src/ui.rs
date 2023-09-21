@@ -1,5 +1,5 @@
 #[cfg(feature = "file_open")]
-use crate::{browse_for_folder_path, browse_for_image_path};
+use crate::{browse_for_folder_path, browse_for_image_path, delete_current_image};
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
@@ -1888,7 +1888,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         #[cfg(not(target_os = "netbsd"))]
-        if let Some(p) = &state.current_path {
+        if state.current_path.is_some() {
             if tooltip(
                 unframed_button_colored("🗑", state.always_on_top, ui),
                 "Move file to trash",
@@ -1897,8 +1897,7 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             )
             .clicked()
             {
-                _ = trash::delete(p);
-                state.send_message("Deleted image");
+                delete_current_image(state);
             }
         }
 
