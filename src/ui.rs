@@ -1888,17 +1888,15 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         }
 
         #[cfg(not(target_os = "netbsd"))]
-        if state.current_path.is_some() {
-            if tooltip(
-                unframed_button_colored("🗑", state.always_on_top, ui),
-                "Move file to trash",
-                &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
-                ui,
-            )
+        if state.current_path.is_some() && tooltip(
+            unframed_button_colored("🗑", state.always_on_top, ui),
+            "Move file to trash",
+            &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
+            ui,
+        )
             .clicked()
-            {
-                delete_current_image(state);
-            }
+        {
+            delete_current_image(state);
         }
 
         ui.add_space(ui.available_width() - 32.);
