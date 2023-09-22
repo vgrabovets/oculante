@@ -1,10 +1,10 @@
 #[cfg(feature = "file_open")]
-use crate::{browse_for_folder_path, browse_for_image_path, delete_current_image};
+use crate::{browse_for_folder_path, browse_for_image_path};
 use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
-    set_zoom,
+    delete_current_image, set_zoom,
     settings::{set_system_theme, ColorTheme},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
