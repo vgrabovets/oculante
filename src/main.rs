@@ -102,12 +102,18 @@ fn main() -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        window_config = window_config.set_lazy_loop(false).set_vsync(true).set_high_dpi(true);
+        window_config = window_config
+            .set_lazy_loop(false)
+            .set_vsync(true)
+            .set_high_dpi(true);
     }
 
     #[cfg(target_os = "linux")]
     {
-        window_config = window_config.set_lazy_loop(false).set_vsync(true).set_high_dpi(true);
+        window_config = window_config
+            .set_lazy_loop(false)
+            .set_vsync(true)
+            .set_high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
@@ -405,11 +411,8 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 state.toggle_slideshow = !state.toggle_slideshow;
             }
             if key_pressed(app, state, DeleteFile) {
-                if let Some(img_path) = &state.current_path {
-                    trash::delete(img_path).expect("Cannot delete file");
-                    state.send_message(format!("file {:?} removed", img_path).as_str());
-                    state.scrubber.delete(img_path);
-                    state.reload_image();
+                if state.current_path.is_some() {
+                    delete_current_image(state);
                 }
             }
             if key_pressed(app, state, Quit) {
@@ -510,6 +513,13 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
+            // #[cfg(not(target_os = "netbsd"))]
+            // if key_pressed(app, state, DeleteFile) {
+            //     if let Some(p) = &state.current_path {
+            //         _ = trash::delete(p);
+            //         state.send_message("Deleted image");
+            //     }
+            // }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -592,12 +602,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                         next_image(state)
                     }
                 } else {
-                    let divisor = if cfg!(macos) {0.1} else {10.};
+                    let divisor = if cfg!(macos) { 0.1 } else { 10. };
                     // Normal scaling
                     let delta = zoomratio(
-                        (delta_y / divisor)
-                        .max(-5.0).min(5.0)
-                        ,
+                        (delta_y / divisor).max(-5.0).min(5.0),
                         state.image_geometry.scale,
                     );
                     info!("Delta {delta}, raw {delta_y}");
@@ -959,8 +967,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             draw.image(texture)
                 .blend_mode(BlendMode::NORMAL)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
-                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y)
-                ;
+                .translate(state.image_geometry.offset.x, state.image_geometry.offset.y);
         } else {
             draw.pattern(texture)
                 .scale(state.image_geometry.scale, state.image_geometry.scale)
@@ -1338,5 +1345,15 @@ fn add_to_favourites(state: &mut OculanteState) {
             state.scrubber.favourites.remove(img_path);
             state.current_image_is_favourite = false;
         }
+    }
+}
+
+fn delete_current_image(state: &mut OculanteState) {
+    if state.current_path.is_some() {
+        let img_path = state.current_path.as_ref().unwrap();
+        trash::delete(&img_path).expect("Cannot delete file");
+        state.send_message(format!("file {:?} removed", img_path).as_str());
+        state.scrubber.delete(&img_path);
+        state.reload_image();
     }
 }

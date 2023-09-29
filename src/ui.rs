@@ -4,7 +4,7 @@ use crate::{
     appstate::{ImageGeometry, Message, OculanteState},
     image_editing::{process_pixels, Channel, GradientStop, ImageOperation, ScaleFilter},
     paint::PaintStroke,
-    set_zoom,
+    delete_current_image, set_zoom,
     settings::{set_system_theme, ColorTheme},
     shortcuts::{key_pressed, keypresses_as_string, lookup},
     utils::{
@@ -1705,7 +1705,15 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
     ui.horizontal_centered(|ui| {
         use crate::shortcuts::InputEvent::*;
 
-        ui.label("Channels");
+        // ui.label("Channels");
+
+        // #[cfg(feature = "file_open")]
+        // if unframed_button("🗁", ui)
+        //     .on_hover_text("Browse for image")
+        //     .clicked()
+        // {
+        //     browse_for_image_path(state)
+        // }
 
         let mut changed_channels = false;
 
@@ -1737,6 +1745,8 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
 
         ui.add_enabled_ui(!state.persistent_settings.edit_enabled, |ui| {
             // hack to center combo box in Y
+
+
 
             ui.spacing_mut().button_padding = Vec2::new(10., 0.);
             egui::ComboBox::from_id_source("channels")
@@ -1876,6 +1886,21 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
         {
             browse_for_folder_path(state, app)
         }
+
+        #[cfg(not(target_os = "netbsd"))]
+        if state.current_path.is_some() && tooltip(
+            unframed_button_colored("🗑", state.always_on_top, ui),
+            "Move file to trash",
+            &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
+            ui,
+        )
+            .clicked()
+        {
+            delete_current_image(state);
+        }
+
+        ui.add_space(ui.available_width() - 32.);
+
 
         ui.scope(|ui| {
             // ui.style_mut().override_text_style = Some(egui::TextStyle::Heading);
