@@ -42,8 +42,12 @@ pub enum InputEvent {
     Copy,
     Paste,
     Browse,
+    BrowseFolder,
     Quit,
     ZenMode,
+    Favourite,
+    CopyImagePathToClipboard,
+    ToggleSlideshow,
 }
 
 pub type Shortcuts = BTreeMap<InputEvent, SimultaneousKeypresses>;
@@ -130,9 +134,13 @@ impl ShortcutExt for Shortcuts {
             .add_key(InputEvent::LosslessRotateLeft, "LBracket")
             .add_key(InputEvent::LosslessRotateRight, "RBracket")
             .add_key(InputEvent::ZenMode, "Z")
+            .add_key(InputEvent::Favourite, "J")
+            .add_key(InputEvent::ToggleSlideshow, "Space")
             .add_key(InputEvent::DeleteFile, "Delete")
             // .add_key(InputEvent::Browse, "F1") // FIXME: As Shortcuts is a HashMap, only the newer key-sequence will be registered
             .add_keys(InputEvent::Browse, &["LControl", "O"])
+            .add_keys(InputEvent::BrowseFolder, &["LControl", "LShift", "O"])
+            .add_key(InputEvent::CopyImagePathToClipboard, "P")
             .add_keys(InputEvent::PanRight, &["LShift", "Right"])
             .add_keys(InputEvent::PanLeft, &["LShift", "Left"])
             .add_keys(InputEvent::PanDown, &["LShift", "Down"])
@@ -180,7 +188,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
     // early out if just one key is pressed, and it's a modifier
     if app.keyboard.alt() || app.keyboard.shift() || app.keyboard.ctrl() {
         if app.keyboard.down.len() == 1 {
-            debug!("just modifier down");
             return false;
         }
     }
@@ -245,9 +252,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 {
                     for (dn, _) in &app.keyboard.down {
                         if format!("{:?}", dn) == key {
-                            debug!("REPEAT: Number of keys down: {}", app.keyboard.down.len());
-                            debug!("Matched {:?} / {:?}", command, key);
-                            debug!("d {}", app.system_timer.delta_f32());
                             return true;
                         }
                     }
@@ -256,8 +260,6 @@ pub fn key_pressed(app: &mut App, state: &mut OculanteState, command: InputEvent
                 for pressed in &app.keyboard.pressed {
                     // debug!("{:?}", pressed);
                     if format!("{:?}", pressed) == key {
-                        debug!("Number of keys pressed: {}", app.keyboard.down.len());
-                        debug!("Matched {:?} / {:?}", command, key);
                         return true;
                     }
                 }

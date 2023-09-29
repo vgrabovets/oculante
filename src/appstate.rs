@@ -1,4 +1,5 @@
 use crate::{
+    db::DB,
     image_editing::EditState,
     scrubber::Scrubber,
     settings::PersistentSettings,
@@ -10,6 +11,7 @@ use notan::{egui::epaint::ahash::HashMap, prelude::Texture, AppState};
 use std::{
     path::PathBuf,
     sync::mpsc::{self, Receiver, Sender},
+    time::Instant,
 };
 
 #[derive(Debug, Clone)]
@@ -55,6 +57,7 @@ pub struct OculanteState {
     pub cursor: Vector2<f32>,
     pub cursor_relative: Vector2<f32>,
     pub image_dimension: (u32, u32),
+    pub image_size: u64,
     pub sampled_color: [f32; 4],
     pub mouse_delta: Vector2<f32>,
     pub texture_channel: (Sender<Frame>, Receiver<Frame>),
@@ -80,13 +83,19 @@ pub struct OculanteState {
     pub always_on_top: bool,
     pub network_mode: bool,
     /// how long the toast message appears
-    pub toast_cooldown: f32,
+    pub toast_cooldown: Instant,
     /// data to transform image once fullscreen is entered/left
     pub fullscreen_offset: Option<(i32, i32)>,
     /// List of images to cycle through. Usually the current dir or dropped files
     pub scrubber: Scrubber,
     pub checker_texture: Option<Texture>,
     pub redraw: bool,
+    pub folder_selected: Option<PathBuf>,
+    pub toggle_slideshow: bool,
+    pub slideshow_time: Instant,
+    pub current_image_is_favourite: bool,
+    pub db: Option<DB>,
+    pub show_metadata_tooltip: bool,
     pub first_start: bool,
 }
 
@@ -97,6 +106,41 @@ impl OculanteState {
 
     pub fn send_message_err(&self, msg: &str) {
         _ = self.message_channel.0.send(Message::err(msg));
+    }
+
+    pub fn reload_image(&mut self) {
+        if let Ok(img_path) = self.scrubber.set(self.scrubber.index) {
+            self.is_loaded = false;
+            self.current_path = Some(img_path.clone());
+            self.player.load(img_path.as_path(), self.message_channel.0.clone());
+        } else {
+            self.reset();
+            self.send_message_err("No images");
+        }
+    }
+
+    pub fn cursor_within_image(&self) -> bool {
+        let img_dims_scaled = (
+            self.image_dimension.0 as f32 * self.image_geometry.scale,
+            self.image_dimension.1 as f32 * self.image_geometry.scale,
+        );
+        let img_x = (
+            self.image_geometry.offset[0],
+            self.image_geometry.offset[0] + img_dims_scaled.0,
+        );
+        let img_y = (
+            self.image_geometry.offset[1],
+            self.image_geometry.offset[1] + img_dims_scaled.1,
+        );
+
+        img_x.0 <= self.cursor[0]
+            && self.cursor[0] <= img_x.1
+            && img_y.0 <= self.cursor[1]
+            && self.cursor[1] <= img_y.1
+    }
+
+    fn reset(&mut self) {
+        *self = OculanteState::default();
     }
 }
 
@@ -116,6 +160,7 @@ impl Default for OculanteState {
             cursor: Default::default(),
             cursor_relative: Default::default(),
             image_dimension: (0, 0),
+            image_size: 0,
             sampled_color: [0., 0., 0., 0.],
             player: Player::new(tx_channel.0.clone(), 20, 16384),
             texture_channel: tx_channel,
@@ -138,11 +183,17 @@ impl Default for OculanteState {
             always_on_top: Default::default(),
             network_mode: Default::default(),
             window_size: Default::default(),
-            toast_cooldown: Default::default(),
+            toast_cooldown: Instant::now(),
             fullscreen_offset: Default::default(),
             scrubber: Default::default(),
             checker_texture: Default::default(),
             redraw: Default::default(),
+            folder_selected: Default::default(),
+            toggle_slideshow: false,
+            slideshow_time: Instant::now(),
+            current_image_is_favourite: Default::default(),
+            db: None,
+            show_metadata_tooltip: false,
             first_start: true,
         }
     }

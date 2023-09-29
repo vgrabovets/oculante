@@ -159,14 +159,12 @@ impl Player {
     }
 
     pub fn load(&mut self, img_location: &Path, message_sender: Sender<Message>) {
-        debug!("Stopping player on load");
         self.stop();
         let (stop_sender, stop_receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
         self.stop_sender = stop_sender;
 
         if let Some(cached_image) = self.cache.get(img_location) {
             _ = self.image_sender.send(Frame::new_still(cached_image));
-            info!("Cache hit for {}", img_location.display());
             return;
         }
 
@@ -279,7 +277,9 @@ pub fn send_image_threaded(
             }
             Err(e) => {
                 error!("{e}");
-                _ = message_sender.send(Message::LoadError(e.to_string()));
+                _ = message_sender.send(
+                    Message::LoadError(format!("File {} does not exist", loc.display()))
+                );
             }
         }
     });
@@ -545,7 +545,7 @@ impl ImageExt for RgbaImage {
             .with_mipmaps(true)
             // .with_format(notan::prelude::TextureFormat::SRgba8)
             // .with_premultiplied_alpha()
-            .with_filter(TextureFilter::Linear, TextureFilter::Nearest)
+            .with_filter(TextureFilter::Linear, TextureFilter::Linear)
             // .with_wrap(TextureWrap::Clamp, TextureWrap::Clamp)
             
             .build()
@@ -620,28 +620,30 @@ pub fn load_image_from_path(p: &Path, state: &mut OculanteState) {
 pub fn last_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
         let last = state.scrubber.len().saturating_sub(1);
-        let next_img = state.scrubber.set(last);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
+        if let Ok(next_img) = state.scrubber.set(last) {
+            // prevent reload if at last or first
+            if &next_img != img_location {
+                state.is_loaded = false;
+                *img_location = next_img;
+                state
+                    .player
+                    .load(img_location, state.message_channel.0.clone());
+            }
         }
     }
 }
 
 pub fn first_image(state: &mut OculanteState) {
     if let Some(img_location) = state.current_path.as_mut() {
-        let next_img = state.scrubber.set(0);
-        // prevent reload if at last or first
-        if &next_img != img_location {
-            state.is_loaded = false;
-            *img_location = next_img;
-            state
-                .player
-                .load(img_location, state.message_channel.0.clone());
+        if let Ok(next_img) = state.scrubber.set(0) {
+            // prevent reload if at last or first
+            if &next_img != img_location {
+                state.is_loaded = false;
+                *img_location = next_img;
+                state
+                    .player
+                    .load(img_location, state.message_channel.0.clone());
+            }
         }
     }
 }
@@ -732,6 +734,22 @@ pub fn toggle_zen_mode(state: &mut OculanteState, app: &mut App) {
         )));
     }
     set_title(app, state);
+}
+
+pub fn format_bytes(bytes: f64) -> String {
+    const KILOBYTE: f64 = 1000.;
+    const MEGABYTE: f64 = KILOBYTE * 1000.;
+    const GIGABYTE: f64 = MEGABYTE * 1000.;
+
+    if bytes < KILOBYTE {
+        format!("{} bytes", bytes)
+    } else if bytes < MEGABYTE {
+        format!("{:.1} KB", bytes / KILOBYTE)
+    } else if bytes < GIGABYTE {
+        format!("{:.1} MB", bytes / MEGABYTE)
+    } else {
+        format!("{:.1} GB", bytes / GIGABYTE)
+    }
 }
 
 /// Fix missing exif by re-applying exif to saved files

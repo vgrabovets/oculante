@@ -2,25 +2,29 @@
 
 use clap::Arg;
 use clap::Command;
-use log::debug;
-use log::error;
-use log::info;
-use log::warn;
+use clipboard::{ClipboardContext, ClipboardProvider};
+use log::{debug, error, info, warn};
 use nalgebra::Vector2;
 use notan::app::Event;
 use notan::draw::*;
 use notan::egui::{self, *};
 use notan::prelude::*;
+use round::round;
 use shortcuts::key_pressed;
+use std::collections::HashSet;
+use std::ffi::OsStr;
+use std::fs::{self, File};
+use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 pub mod cache;
 pub mod scrubber;
 pub mod settings;
 pub mod shortcuts;
 #[cfg(feature = "turbo")]
 use crate::image_editing::lossless_tx;
-use crate::scrubber::find_first_image_in_directory;
+use crate::scrubber::{Scrubber, find_first_image_in_directory};
 use crate::settings::set_system_theme;
 use crate::settings::ColorTheme;
 use crate::shortcuts::InputEvent::*;
@@ -41,22 +45,47 @@ mod ui;
 mod update;
 use ui::*;
 
+mod db;
+use crate::db::{DB, get_db_file};
 use crate::image_editing::EditState;
 
 mod image_editing;
 pub mod paint;
 
 pub const FONT: &[u8; 309828] = include_bytes!("../res/fonts/Inter-Regular.ttf");
+const STAR: ui::Star = ui::Star {
+    spikes: 5,
+    outer_radius: 20.,
+    inner_radius: 10.,
+    x: 50.,
+    y: 60.,
+    stroke: 3.,
+};
+const TOP_MENU_HEIGHT: f32 = 30.;
+
 
 #[notan_main]
 fn main() -> Result<(), String> {
+    env_logger::builder()
+        .format(|buf, record| {
+            writeln!(buf,
+                     "{}:{} {} - {}",
+                     record.file().unwrap_or("unknown"),
+                     record.line().unwrap_or(0),
+                     record.level(),
+                     record.args()
+            )
+        })
+        .filter(Some("oculante"), log::LevelFilter::Debug)
+        .init();
+
     if std::env::var("RUST_LOG").is_err() {
         std::env::set_var("RUST_LOG", "warning");
     }
     // on debug builds, override log level
     #[cfg(debug_assertions)]
     {
-        std::env::set_var("RUST_LOG", "debug");
+        std::env::set_var("RUST_LOG", "oculante=debug");
         let _ = env_logger::try_init();
     }
 
@@ -74,7 +103,7 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         window_config = window_config
-            .set_lazy_loop(true)
+            .set_lazy_loop(false)
             .set_vsync(true)
             .set_high_dpi(true);
     }
@@ -82,20 +111,20 @@ fn main() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         window_config = window_config
-            .set_lazy_loop(true)
+            .set_lazy_loop(false)
             .set_vsync(true)
             .set_high_dpi(true);
     }
 
     #[cfg(target_os = "netbsd")]
     {
-        window_config = window_config.set_lazy_loop(true).set_vsync(true);
+        window_config = window_config.set_lazy_loop(false).set_vsync(true);
     }
 
     #[cfg(target_os = "macos")]
     {
         window_config = window_config
-            .set_lazy_loop(true)
+            .set_lazy_loop(false)
             .set_vsync(true)
             .set_high_dpi(true);
     }
@@ -196,8 +225,6 @@ fn init(gfx: &mut Graphics, plugins: &mut Plugins) -> OculanteState {
         state.persistent_settings.max_cache,
         gfx.limits().max_texture_size,
     );
-
-    debug!("Image is: {:?}", maybe_img_location);
 
     if let Some(ref location) = maybe_img_location {
         // Check if path is a directory or a file (and that it even exists)
@@ -326,10 +353,16 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::KeyDown { .. } => {
-            debug!("key down");
-
             // return;
             // pan image with keyboard
+            if state.key_grab {
+                state.send_message_err("Shortcuts don't work, key grab is active");
+            }
+
+            if state.message.is_some() {
+                state.message = None;
+            }
+
             let delta = 40.;
             if key_pressed(app, state, PanRight) {
                 state.image_geometry.offset.x += delta;
@@ -371,8 +404,24 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, ZoomFive) {
                 set_zoom(5.0, None, state);
             }
+            if key_pressed(app, state, Favourite) {
+                add_to_favourites(state);
+            }
+            if key_pressed(app, state, ToggleSlideshow) {
+                state.toggle_slideshow = !state.toggle_slideshow;
+            }
+            if key_pressed(app, state, DeleteFile) {
+                if state.current_path.is_some() {
+                    delete_current_image(state);
+                }
+            }
             if key_pressed(app, state, Quit) {
                 state.persistent_settings.save_blocking();
+
+                if let Some(ref mut db) = state.db {
+                    db.close();
+                }
+
                 app.backend.exit();
             }
             #[cfg(feature = "turbo")]
@@ -420,8 +469,18 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
             #[cfg(feature = "file_open")]
             if key_pressed(app, state, Browse) {
-                state.redraw = true;
-                browse_for_image_path(state);
+                browse_for_image_path(state, app)
+            }
+            #[cfg(feature = "file_open")]
+            if key_pressed(app, state, BrowseFolder) {
+                browse_for_folder_path(state, app)
+            }
+            if key_pressed(app, state, CopyImagePathToClipboard) {
+                if let Some(img_path) = &state.current_path {
+                    let mut ctx: ClipboardContext = ClipboardProvider::new().expect("Cannot create Clipboard context");
+                    ctx.set_contents(img_path.to_string_lossy().to_string()).expect("Cannot set Clipboard context");
+                    state.send_message(format!("path {:?} copied", img_path).as_str());
+                }
             }
             if key_pressed(app, state, NextImage) {
                 if state.is_loaded {
@@ -454,13 +513,13 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             if key_pressed(app, state, EditMode) {
                 state.persistent_settings.edit_enabled = !state.persistent_settings.edit_enabled;
             }
-            #[cfg(not(target_os = "netbsd"))]
-            if key_pressed(app, state, DeleteFile) {
-                if let Some(p) = &state.current_path {
-                    _ = trash::delete(p);
-                    state.send_message("Deleted image");
-                }
-            }
+            // #[cfg(not(target_os = "netbsd"))]
+            // if key_pressed(app, state, DeleteFile) {
+            //     if let Some(p) = &state.current_path {
+            //         _ = trash::delete(p);
+            //         state.send_message("Deleted image");
+            //     }
+            // }
             if key_pressed(app, state, ZoomIn) {
                 let delta = zoomratio(3.5, state.image_geometry.scale);
                 let new_scale = state.image_geometry.scale + delta;
@@ -517,7 +576,7 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
 
     match evt {
         Event::Exit => {
-            info!("About to exit");
+            debug!("About to exit");
             // save position
             state.persistent_settings.window_geometry = (
                 (
@@ -527,6 +586,10 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
                 app.window().size(),
             );
             state.persistent_settings.save_blocking();
+
+            if let Some(ref mut db) = state.db {
+                db.close();
+            }
         }
         Event::MouseWheel { delta_y, .. } => {
             if !state.pointer_over_ui {
@@ -576,17 +639,27 @@ fn event(app: &mut App, state: &mut OculanteState, evt: Event) {
             }
         }
         Event::MouseDown { button, .. } => {
-            state.drag_enabled = true;
-            match button {
-                MouseButton::Left => {
-                    if !state.mouse_grab {
-                        state.drag_enabled = true;
+            if state.cursor_within_image() {
+                match button {
+                    MouseButton::Left => {
+                        if !state.mouse_grab {
+                            state.drag_enabled = true;
+                        }
                     }
+                    MouseButton::Middle => {
+                        state.show_metadata_tooltip = !state.show_metadata_tooltip;
+                    }
+                    MouseButton::Right => {
+                        if state.current_image.is_some() {
+                            if round(state.image_geometry.offset[1] as f64, 4) == 0. {
+                                set_zoom(1., None, state);
+                            } else {
+                                state.reset_image = true;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-                MouseButton::Middle => {
-                    state.drag_enabled = true;
-                }
-                _ => {}
             }
         }
         Event::MouseUp { button, .. } => match button {
@@ -666,25 +739,30 @@ fn update(app: &mut App, state: &mut OculanteState) {
     // Only receive messages if current one is cleared
     // debug!("cooldown {}", state.toast_cooldown);
 
-    if state.message.is_none() {
-        state.toast_cooldown = 0.;
+    // check if a new message has been sent
+    if let Ok(msg) = state.message_channel.1.try_recv() {
+        debug!("Received message: {:?}", msg);
+        state.toast_cooldown = Instant::now();
 
-        // check if a new message has been sent
-        if let Ok(msg) = state.message_channel.1.try_recv() {
-            debug!("Received message: {:?}", msg);
-            match msg {
-                Message::LoadError(_) => {
-                    state.current_image = None;
-                    state.is_loaded = true;
-                    state.current_texture = None;
-                }
-                _ => (),
-            }
-
-            state.message = Some(msg);
+        if let Message::LoadError(_) = msg {
+            state.current_image = None;
+            state.is_loaded = true;
+            state.current_texture = None;
+            set_title(app, state);
         }
+
+        state.message = Some(msg);
     }
+
     state.first_start = false;
+
+    if state.toggle_slideshow
+        && state.is_loaded
+        && state.slideshow_time.elapsed() >= Duration::from_secs(state.persistent_settings.slideshow_delay)
+    {
+        next_image(state);
+        state.slideshow_time = Instant::now();
+    }
 }
 
 fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut OculanteState) {
@@ -712,15 +790,29 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
         set_title(app, state);
 
-        // fill image sequence
-        if let Some(p) = &state.current_path {
-            state.scrubber = scrubber::Scrubber::new(p);
-            state.scrubber.wrap = state.persistent_settings.wrap_folder;
+        if let Some(current_path) = &state.current_path {
+            state.current_image_is_favourite = state.scrubber.favourites.contains(current_path);
 
-            // debug!("{:#?} from {}", &state.scrubber, p.display());
-            if !state.persistent_settings.recent_images.contains(p) {
-                state.persistent_settings.recent_images.insert(0, p.clone());
-                state.persistent_settings.recent_images.truncate(10);
+            match fs::metadata(current_path) {
+                Ok(metadata) => {
+                    state.image_size = metadata.len();
+                }
+                Err(_) => state.send_message_err("Couldn't get metadata"),
+            }
+
+        }
+
+        // fill image sequence
+        if state.folder_selected.is_none() {
+            if let Some(p) = &state.current_path {
+                state.scrubber = scrubber::Scrubber::new(p, false, false, None, 0);
+                state.scrubber.wrap = state.persistent_settings.wrap_folder;
+
+                // debug!("{:#?} from {}", &state.scrubber, p.display());
+                if !state.persistent_settings.recent_images.contains(p) {
+                    state.persistent_settings.recent_images.insert(0, p.clone());
+                    state.persistent_settings.recent_images.truncate(10);
+                }
             }
         }
 
@@ -762,7 +854,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                             }
                         }
                     } else if let Some(parent) = p.parent() {
-                        info!("Looking for {}", parent.join(".oculante").display());
                         if parent.join(".oculante").is_file() {
                             info!("is file {}", parent.join(".oculante").display());
 
@@ -846,7 +937,6 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             state.image_geometry.offset =
                 window_size / 2.0 - (img_size * state.image_geometry.scale) / 2.0;
 
-            debug!("Image has been reset.");
             state.reset_image = false;
         }
         // app.window().request_frame();
@@ -946,15 +1036,43 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                 // }
             }
         }
+
+        if state.current_image_is_favourite {
+            draw.star(STAR.spikes, STAR.outer_radius, STAR.inner_radius)
+                .position(STAR.x, STAR.y)
+                .fill_color(Color::YELLOW)
+                .fill()
+                .stroke_color(Color::ORANGE)
+                .stroke(STAR.stroke);
+        }
     }
 
     let egui_output = plugins.egui(|ctx| {
         // the top menu bar
 
+        if state.show_metadata_tooltip && !state.pointer_over_ui && state.cursor_within_image() {
+            let pos_y = TOP_MENU_HEIGHT + 5. + if state.current_image_is_favourite { STAR.y } else { 0. };
+
+            show_tooltip_at(
+                ctx,
+                egui::Id::new("my_tooltip"),
+                Some(pos2(10., pos_y)),
+                |ui| {
+                    ui.label(format!(
+                        "scale: {scale}\nwidth: {width}\nheight: {height}\nsize: {size}",
+                        scale = round(state.image_geometry.scale as f64, 2),
+                        width = state.image_dimension.0,
+                        height = state.image_dimension.1,
+                        size = format_bytes(state.image_size as f64),
+                    ));
+                },
+            );
+        }
+
         if !state.persistent_settings.zen_mode {
             egui::TopBottomPanel::top("menu")
-                .min_height(30.)
-                .default_height(30.)
+                .min_height(TOP_MENU_HEIGHT)
+                .default_height(TOP_MENU_HEIGHT)
                 .show(ctx, |ui| {
                     main_menu(ui, state, app, gfx);
                 });
@@ -1002,12 +1120,10 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
                     ui.ctx().request_repaint();
                 },
             );
-            let max_anim_len = 2.5;
 
-            state.toast_cooldown += app.timer.delta_f32();
+            // state.toast_cooldown += app.timer.delta_f32();
 
-            if state.toast_cooldown > max_anim_len {
-                debug!("Setting message to none, timer reached.");
+            if state.toast_cooldown.elapsed() > Duration::from_secs(3u64) {
                 state.message = None;
             }
         }
@@ -1026,7 +1142,7 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
             edit_ui(app, ctx, state, gfx);
         }
 
-        if !state.is_loaded {
+        if !state.is_loaded && !state.toggle_slideshow {
             egui::TopBottomPanel::bottom("loader").show_animated(
                 ctx,
                 state.current_path.is_some(),
@@ -1084,20 +1200,100 @@ fn drawe(app: &mut App, gfx: &mut Graphics, plugins: &mut Plugins, state: &mut O
 
 // Show file browser to select image to load
 #[cfg(feature = "file_open")]
-fn browse_for_image_path(state: &mut OculanteState) {
-    let start_directory = state.persistent_settings.last_open_directory.clone();
-    let load_sender = state.load_channel.0.clone();
-    state.redraw = true;
-    std::thread::spawn(move || {
-        let file_dialog_result = rfd::FileDialog::new()
-            .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
-            .add_filter("All File Types", &["*"])
-            .set_directory(start_directory)
-            .pick_file();
-        if let Some(file_path) = file_dialog_result {
-            let _ = load_sender.send(file_path);
+fn browse_for_image_path(state: &mut OculanteState, app: &mut App) {
+    app.keyboard.down = Default::default();
+    let start_directory = &state.persistent_settings.last_open_directory;
+
+    let file_dialog_result = rfd::FileDialog::new()
+        .add_filter("All Supported Image Types", utils::SUPPORTED_EXTENSIONS)
+        .add_filter("All File Types", &["*"])
+        .set_directory(start_directory)
+        .pick_file();
+
+    if let Some(file_path) = file_dialog_result {
+        let mut current_path = file_path.clone();
+        state.folder_selected = None;
+
+        if file_path.extension() == Some(OsStr::new("txt")) {
+            let file = File::open(&file_path).unwrap();
+            let reader = io::BufReader::new(file);
+            let img_paths: Vec<PathBuf> = reader
+                .lines()
+                .map_while(Result::ok)
+                .map(PathBuf::from)
+                .collect();
+
+            state.folder_selected = Some(file_path.parent().unwrap().to_path_buf());
+            state.scrubber = Scrubber::new_from_entries(img_paths);
+            current_path = state.scrubber.get(0).unwrap();
         }
-    });
+
+        state.is_loaded = false;
+        state.current_image = None;
+        state
+            .player
+            .load(&current_path, state.message_channel.0.clone());
+        if let Some(dir) = file_path.parent() {
+            state.persistent_settings.last_open_directory = dir.to_path_buf();
+        }
+        state.current_path = Some(current_path);
+        _ = state.persistent_settings.save();
+    }
+}
+
+#[cfg(feature = "file_open")]
+fn browse_for_folder_path(state: &mut OculanteState, app: &mut App) {
+    app.keyboard.down = Default::default();
+    let start_directory = &state.persistent_settings.last_open_directory;
+
+    let folder_dialog_result = rfd::FileDialog::new()
+        .set_directory(start_directory)
+        .pick_folder();
+
+    if let Some(folder_path) = folder_dialog_result {
+        state.persistent_settings.last_open_directory = folder_path.clone();
+        state.persistent_settings.save();
+        state.folder_selected = Some(folder_path.clone());
+
+        let db_file = get_db_file(&folder_path);
+
+        let favourites: Option<HashSet<PathBuf>> = if db_file.exists() {
+            state.db = Some(DB::new(&folder_path));
+            Some(state.db.as_ref().unwrap().get_all())
+        } else {
+            None
+        };
+
+        state.scrubber = Scrubber::new(
+            folder_path.as_path(),
+            true,
+            true,
+            favourites,
+            state.persistent_settings.add_fav_every_n,
+        );
+        let number_of_files = state.scrubber.len();
+        let number_of_favs = state.scrubber.favourites.len();
+        if number_of_files > 0 {
+            state.send_message(
+                &format!(
+                    "files: {}, favourites: {}",
+                    number_of_files,
+                    number_of_favs,
+                ),
+            );
+            let current_path = state.scrubber.get(0).unwrap();
+
+            state.is_loaded = false;
+            state.current_image = None;
+            state
+                .player
+                .load(current_path.as_path(), state.message_channel.0.clone());
+
+            state.current_path = Some(current_path);
+        } else {
+            state.send_message_err(&format!("No supported image files in {:?}", folder_path));
+        }
+    }
 }
 
 // Make sure offset is restricted to window size so we don't offset to infinity
@@ -1131,4 +1327,33 @@ fn set_zoom(scale: f32, from_center: Option<Vector2<f32>>, state: &mut OculanteS
         delta,
     );
     state.image_geometry.scale = scale;
+}
+
+fn add_to_favourites(state: &mut OculanteState) {
+    if let Some(img_path) = &state.current_path {
+        if state.db.is_none() {
+            state.db = Some(DB::new(state.folder_selected.as_ref().unwrap()));
+        }
+
+        if !state.scrubber.favourites.contains(img_path) {
+            state.db.as_ref().unwrap().insert(img_path);
+            state.scrubber.favourites.insert(img_path.clone());
+            state.current_image_is_favourite = true;
+
+        } else {
+            state.db.as_ref().unwrap().delete(img_path);
+            state.scrubber.favourites.remove(img_path);
+            state.current_image_is_favourite = false;
+        }
+    }
+}
+
+fn delete_current_image(state: &mut OculanteState) {
+    if state.current_path.is_some() {
+        let img_path = state.current_path.as_ref().unwrap();
+        trash::delete(&img_path).expect("Cannot delete file");
+        state.send_message(format!("file {:?} removed", img_path).as_str());
+        state.scrubber.delete(&img_path);
+        state.reload_image();
+    }
 }
