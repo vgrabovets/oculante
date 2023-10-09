@@ -1887,14 +1887,12 @@ pub fn main_menu(ui: &mut Ui, state: &mut OculanteState, app: &mut App, gfx: &mu
             browse_for_folder_path(state, app)
         }
 
-        #[cfg(not(target_os = "netbsd"))]
         if state.current_path.is_some() && tooltip(
             unframed_button_colored("🗑", state.always_on_top, ui),
             "Move file to trash",
             &lookup(&state.persistent_settings.shortcuts, &DeleteFile),
             ui,
-        )
-            .clicked()
+        ).clicked()
         {
             delete_current_image(state);
         }
